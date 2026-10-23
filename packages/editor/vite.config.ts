@@ -15,6 +15,8 @@ export default defineConfig({
   build: {
     target: 'es2022',
     reportCompressedSize: true,
+    // Blockly (~940 kB raw) is its own lazily loaded chunk; keep the warning for anything else.
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       input: {
         main: resolve(import.meta.dirname, 'index.html'),

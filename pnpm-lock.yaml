@@ -1,7 +1,7 @@
 lockfileVersion: '9.0'
 
 settings:
-  autoInstallPeers: true
+  autoInstallPeers: false
   excludeLinksFromLockfile: false
 
 importers:
@@ -38,6 +38,22 @@ importers:
       vitest:
         specifier: ^5.0.5
         version: 5.0.5(@types/node@24.19.2)(@vitest/browser-playwright@5.0.5)(@vitest/ui@5.0.5)(vite@8.3.5(@types/node@24.19.2))
+
+  packages/blocks:
+    dependencies:
+      '@blockly/field-multilineinput':
+        specifier: ^13.4.0
+        version: 13.4.0(blockly@13.4.0)
+      '@stitch/ir':
+        specifier: workspace:*
+        version: link:../ir
+      blockly:
+        specifier: ^13.4.0
+        version: 13.4.0
+    devDependencies:
+      '@stitch/lang':
+        specifier: workspace:*
+        version: link:../lang
 
   packages/cart:
     dependencies:
@@ -78,6 +94,9 @@ importers:
       '@codemirror/view':
         specifier: ^6.43.15
         version: 6.43.15
+      '@stitch/blocks':
+        specifier: workspace:*
+        version: link:../blocks
       '@stitch/cart':
         specifier: workspace:*
         version: link:../cart
@@ -160,6 +179,11 @@ packages:
 
   '@blazediff/core@1.10.0':
     resolution: {integrity: sha512-AOQff0zgR7cGsZL+4E7hVkmujoPUpm0J9xzWGWZj5wCjd3gmxESXAPfKyuzs93VdpQNFhHlBhfOjrcZ+XTERtQ==}
+
+  '@blockly/field-multilineinput@13.4.0':
+    resolution: {integrity: sha512-4u24r9PByPy40t39R2B588nxvTNviIWZ1zDeJkUsN7FzjbyXJNOGCAnonjJQhUSet86AGCdlrcNDGHGRGimUnA==}
+    peerDependencies:
+      blockly: ^13.2.0
 
   '@cacheable/memory@2.2.0':
     resolution: {integrity: sha512-CTLKqLItRCEixEAewD3/j9DB3/o96gpTPD4eJ1v+DGOlxZRZncRQkGYqqnAGCscYd6RNeXfGeiuCphsPtqyIfQ==}
@@ -546,6 +570,12 @@ packages:
   balanced-match@4.0.4:
     resolution: {integrity: sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA==}
     engines: {node: 18 || 20 || >=22}
+
+  blockly@13.4.0:
+    resolution: {integrity: sha512-cWZJV5nocL+VWOG9Vfm6j8shdOLGyvKkyoGOS2bk9u6PKb4qqLp50NeL8YoNMTEi7fHmY37eBYT1yC6Y7/yZ7w==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      jsdom: '>=27.4.0 <31.0.0'
 
   brace-expansion@5.0.12:
     resolution: {integrity: sha512-YovQ3rzhaLMIrDjNDMkNS01tea93qhEhG5xy8f6+R0l+dw3Ki+5sCoIoI942iuLZTHWogWktgwVDhU09iNEimQ==}
@@ -1201,6 +1231,10 @@ snapshots:
 
   '@blazediff/core@1.10.0': {}
 
+  '@blockly/field-multilineinput@13.4.0(blockly@13.4.0)':
+    dependencies:
+      blockly: 13.4.0
+
   '@cacheable/memory@2.2.0':
     dependencies:
       '@cacheable/utils': 2.5.0
@@ -1605,6 +1639,8 @@ snapshots:
   axobject-query@4.1.0: {}
 
   balanced-match@4.0.4: {}
+
+  blockly@13.4.0: {}
 
   brace-expansion@5.0.12:
     dependencies:

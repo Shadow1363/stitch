@@ -7,6 +7,7 @@ import {
   type Block,
   type EventSpec,
   type Expr,
+  type FunctionDef,
   type IdGen,
   type LValue,
   type Module,
@@ -279,13 +280,10 @@ class Lowerer {
           .getChild('ParamList')!
           .getChildren('Name')
           .map((p) => this.textOf(p));
-        return this.finish(n, {
-          id,
-          kind: 'FunctionDef',
-          name,
-          params,
-          body: this.body(n.getChild('Body')!),
-        });
+        const body = this.body(n.getChild('Body')!);
+        const def: FunctionDef = { id, kind: 'FunctionDef', name, params, body };
+        if (n.getChild('warp')) def.warp = true;
+        return this.finish(n, def);
       }
       case 'EventScript': {
         const id = this.ids.next();
@@ -309,8 +307,13 @@ class Lowerer {
   }
 
   private body(b: SyntaxNode): Block {
-    const from = b.prevSibling?.to ?? b.from;
-    const to = b.nextSibling?.from ?? b.parent?.nextSibling?.from ?? b.to;
+    // Comments before the first statement can be siblings of Body, so skip them when finding
+    // the tokens that bound this body's region.
+    const prev = skipComments(b.prevSibling, 'prev');
+    const next =
+      skipComments(b.nextSibling, 'next') ?? skipComments(b.parent?.nextSibling ?? null, 'next');
+    const from = prev?.to ?? b.from;
+    const to = next?.from ?? b.to;
     const { items, trailing } = this.lowerSequence(b, from, to, (n) => this.stmt(n));
     const block: Block = { stmts: items };
     if (trailing) block.trailing = trailing;
@@ -562,6 +565,11 @@ class Lowerer {
     }
     return { from, to, message: `unexpected '${this.text.slice(from, to).split('\n')[0]}'` };
   }
+}
+
+function skipComments(n: SyntaxNode | null, dir: 'prev' | 'next'): SyntaxNode | null {
+  while (n && n.name === 'LineComment') n = dir === 'prev' ? n.prevSibling : n.nextSibling;
+  return n;
 }
 
 function setTrivia(target: { trivia?: Trivia }, t: Trivia | undefined) {

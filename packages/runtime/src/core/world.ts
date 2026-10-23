@@ -22,6 +22,8 @@ export interface WorldOptions {
   /** Costume metadata by asset id. Sizes come from the decoded images. */
   costumes: Record<string, CostumeInfo>;
   seed?: number;
+  /** Clock for the warp budget; injectable for tests. */
+  now?: () => number;
   onLog?: (sprite: string, text: string) => void;
   onError?: (e: { sprite: string; event: string; error: unknown }) => void;
 }
@@ -40,10 +42,15 @@ export interface RuntimeApi {
   /** sprite id ("$stage" for the stage) -> module id */
   instantiate(map: Record<string, string>): void;
   on(S: Sprite, event: EventType, arg: string | null, body: () => ThreadGen): void;
+  /** True once the current tick has run longer than WARP_BUDGET_MS; warp loops then yield. */
+  overBudget(): boolean;
   readonly STOP: typeof STOP_THREAD;
 }
 
 export const STAGE_ID = '$stage';
+
+/** A warp loop may run this long in one tick before it yields anyway (as Scratch). */
+export const WARP_BUDGET_MS = 500;
 
 export class World implements RenderView {
   readonly space: Space;
@@ -55,11 +62,14 @@ export class World implements RenderView {
   readonly random: () => number;
   ticks = 0;
   timerStart = 0;
+  private tickStart = 0;
+  private readonly now: () => number;
   private drawList: Sprite[];
   private currentSprite = '';
 
   constructor(private opts: WorldOptions) {
     this.space = createSpace(opts.stage);
+    this.now = opts.now ?? (() => performance.now());
     this.random = createRandom(opts.seed ?? (Math.random() * 2 ** 32) >>> 0);
     this.scheduler = new Scheduler((e) => this.reportError(e));
     this.stage = new Sprite(STAGE_ID, 'stage', [], true);
@@ -107,6 +117,7 @@ export class World implements RenderView {
           f(s, s.vars, G);
         }
       },
+      overBudget: () => this.now() - this.tickStart > WARP_BUDGET_MS,
       on: (S, event, arg, body) =>
         this.scheduler.add({ sprite: S, event, arg, body } satisfies Script),
     };
@@ -119,6 +130,7 @@ export class World implements RenderView {
   }
 
   tick(): void {
+    this.tickStart = this.now();
     for (const key of this.input.takePressed()) this.scheduler.trigger('key', key, false);
     this.scheduler.step();
     this.ticks++;

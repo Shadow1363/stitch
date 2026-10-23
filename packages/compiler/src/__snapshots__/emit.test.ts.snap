@@ -7,15 +7,15 @@ rt.defineModule("m0", function (S, V, G) {
 });
 rt.defineModule("m1", function (S, V, G) {
   V.items = [1, 2];
-  function* f_fact(l_n) {
+  function* f_fact($w, l_n) {
     if (($.cmp(l_n, 1) <= 0)) {
       return 1;
     }
-    return ($.n(l_n) * $.n((yield* f_fact(($.n(l_n) - 1)))));
+    return ($.n(l_n) * $.n((yield* f_fact($w, ($.n(l_n) - 1)))));
   }
   rt.on(S, "message", "go", function* () {
     for (let $i1 = 0, $n2 = Math.round(3); $i1 < $n2; $i1++) {
-      yield* B.say_for(S, ($.s((yield* f_fact(3))) + "!"), 1);
+      yield* B.say_for(S, ($.s((yield* f_fact(false, 3))) + "!"), 1);
       yield;
     }
     for (let $c3 = 10, $e4 = 1, $s5 = (-1); $s5 >= 0 ? $c3 <= $e4 : $c3 >= $e4; $c3 += $s5) {

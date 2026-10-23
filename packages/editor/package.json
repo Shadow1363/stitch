@@ -21,7 +21,8 @@
     "@codemirror/state": "^6.7.6",
     "@codemirror/view": "^6.43.15",
     "pixi.js": "^8.22.0",
-    "svelte": "^5.57.2"
+    "svelte": "^5.57.2",
+    "@stitch/blocks": "workspace:*"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.3.1",

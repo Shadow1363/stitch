@@ -1,4 +1,4 @@
 {
   "extends": "./tsconfig.base.json",
-  "include": ["packages/ir/src", "packages/lang/src", "packages/cart/src", "packages/runtime/src", "packages/compiler/src", "vitest.config.ts", "vitest.browser.config.ts"]
+  "include": ["packages/ir/src", "packages/lang/src", "packages/cart/src", "packages/runtime/src", "packages/compiler/src", "packages/blocks/src", "vitest.config.ts", "vitest.browser.config.ts"]
 }

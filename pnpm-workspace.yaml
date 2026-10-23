@@ -1,2 +1,6 @@
 packages:
   - packages/*
+
+# Blockly lists jsdom as a peer for its Node build only; the browser build never uses it.
+# Peers are installed explicitly instead, which keeps jsdom (and its license tail) out.
+autoInstallPeers: false

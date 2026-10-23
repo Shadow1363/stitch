@@ -106,6 +106,8 @@ class ModuleEmitter {
   private spriteVars = new Set<string>();
   private functions = new Set<string>();
   private scopes: Map<string, string>[] = [];
+  /** Inside a user function, where `$w` (warp flag) is in scope. */
+  private inFunction = false;
   private tmp = 0;
 
   constructor(
@@ -159,8 +161,17 @@ class ModuleEmitter {
 
   private fn(f: FunctionDef) {
     this.scopes = [new Map(f.params.map((p) => [p, `l_${p}`]))];
-    this.w.line(`function* f_${f.name}(${f.params.map((p) => `l_${p}`).join(', ')}) {`, f.id);
+    // `$w` is the warp flag: true inside a warp function and everything it calls.
+    const params = ['$w', ...f.params.map((p) => `l_${p}`)].join(', ');
+    this.w.line(`function* f_${f.name}(${params}) {`, f.id);
+    if (f.warp) {
+      this.w.indent();
+      this.w.line('$w = true;');
+      this.w.dedent();
+    }
+    this.inFunction = true;
     this.block(f.body);
+    this.inFunction = false;
     this.w.line('}');
     this.scopes = [];
   }
@@ -201,7 +212,8 @@ class ModuleEmitter {
   private loopBody(b: Block, loopVar?: { name: string; js: string }) {
     this.block(b, loopVar);
     this.w.indent();
-    this.w.line('yield;');
+    // Warp code skips the per-iteration yield, but still yields once a tick runs past its budget.
+    this.w.line(this.inFunction ? 'if (!$w || rt.overBudget()) yield;' : 'yield;');
     this.w.dedent();
   }
 
@@ -427,7 +439,7 @@ class ModuleEmitter {
   private call(e: Extract<Expr, { kind: 'Call' }>): Code {
     if (this.functions.has(e.name))
       return {
-        js: `(yield* f_${e.name}(${e.args.map((a) => this.expr(a).js).join(', ')}))`,
+        js: `(yield* f_${e.name}(${[this.inFunction ? '$w' : 'false', ...e.args.map((a) => this.expr(a).js)].join(', ')}))`,
         t: 'any',
       };
     const b = getBuiltin(e.name);

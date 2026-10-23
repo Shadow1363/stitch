@@ -1,21 +1,15 @@
-import { normalizeStage, type CartV1, type ImageAsset, type SpriteInit } from '@stitch/cart';
+import { normalizeStage, type CartV1, type ImageAsset } from '@stitch/cart';
 import { compile, nodeAtLine, type CompileResult } from '@stitch/compiler';
-import { createIdGen, IR_VERSION, type Diagnostic, type Project } from '@stitch/ir';
-import { parse, type Span } from '@stitch/lang';
+import { IR_VERSION, type Diagnostic, type Project } from '@stitch/ir';
+import type { Span } from '@stitch/lang';
 import type { CostumeImage, LoadPayload } from '@stitch/runtime/protocol';
 import sampleCart from '../samples/bounce/cart.json';
 import playerSource from '../samples/bounce/player.stitch?raw';
+import { SourceDoc } from './doc';
 
 export const STAGE_FILE = '$stage';
 
-/** One editable source file: the stage or a sprite. */
-export interface SourceFile {
-  id: string;
-  name: string;
-  text: string;
-}
-
-/** Everything in a cart except the program, which is derived from the source files. */
+/** Everything in a cart except the program, which comes from the source docs. */
 export type CartShell = Omit<CartV1, 'project'>;
 
 export interface Located extends Diagnostic {
@@ -31,34 +25,33 @@ export interface Build {
   where: Map<string, { fileId: string; span: Span }>;
 }
 
-export function loadSample(): { shell: CartShell; files: SourceFile[] } {
+export function loadSample(): { shell: CartShell; docs: SourceDoc[] } {
   const raw = sampleCart as unknown as CartShell;
   const shell: CartShell = { ...raw, stage: normalizeStage(raw.stage) };
-  const files: SourceFile[] = [
-    { id: STAGE_FILE, name: 'Stage', text: '-- Stage scripts and global variables go here.\n' },
-    { id: 'player', name: 'Player', text: playerSource },
+  const docs = [
+    new SourceDoc(STAGE_FILE, 'Stage', '-- Stage scripts and global variables go here.\n'),
+    new SourceDoc('player', 'Player', playerSource),
   ];
-  return { shell, files };
+  return { shell, docs };
 }
 
-export function build(shell: CartShell, files: SourceFile[]): Build {
+/** Assembles the project from each doc's IR and compiles it. */
+export function build(shell: CartShell, docs: SourceDoc[]): Build {
   const where = new Map<string, { fileId: string; span: Span }>();
   const syntax: Located[] = [];
-  const modules = new Map<string, Project['stage']>();
-  for (const f of files) {
-    const r = parse(f.text, createIdGen(`${f.id}:`));
-    modules.set(f.id, r.module);
-    for (const [id, span] of r.spans) where.set(id, { fileId: f.id, span });
-    for (const d of r.diagnostics)
-      syntax.push({ severity: 'error', message: d.message, fileId: f.id, span: d, file: f.name });
+  const byId = new Map(docs.map((d) => [d.id, d]));
+  for (const d of docs) {
+    for (const [id, span] of d.spans) where.set(id, { fileId: d.id, span });
+    for (const s of d.syntax)
+      syntax.push({ severity: 'error', message: s.message, fileId: d.id, span: s, file: d.name });
   }
   const project: Project = {
     irVersion: IR_VERSION,
-    stage: modules.get(STAGE_FILE) ?? { items: [] },
-    sprites: shell.sprites.map((s: SpriteInit) => ({
+    stage: byId.get(STAGE_FILE)?.module ?? { items: [] },
+    sprites: shell.sprites.map((s) => ({
       id: s.id,
       name: s.name,
-      module: modules.get(s.id) ?? { items: [] },
+      module: byId.get(s.id)?.module ?? { items: [] },
     })),
   };
   const compiled = compile(

@@ -68,7 +68,7 @@ function topItem(lines: string[], it: TopItem) {
       );
       return;
     case 'FunctionDef':
-      lines.push(`function ${it.name}(${it.params.join(', ')})`);
+      lines.push(`${it.warp ? 'warp ' : ''}function ${it.name}(${it.params.join(', ')})`);
       block(lines, it.body, INDENT);
       lines.push(withLineComment('end', it.trivia));
       return;

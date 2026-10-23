@@ -19,7 +19,8 @@ item { VarDecl | FunctionDef | EventScript }
 
 VarDecl { kw<"global">? kw<"var"> Name "=" expr }
 
-FunctionDef { kw<"function"> Name ParamList Body kw<"end"> }
+// `warp` runs the function without yielding at loop ends (Scratch "run without screen refresh").
+FunctionDef { ckw<"warp">? kw<"function"> Name ParamList Body kw<"end"> }
 
 ParamList { "(" commaSep<Name> ")" }
 

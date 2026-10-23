@@ -50,6 +50,8 @@ export interface VarDecl extends Base {
 
 export interface FunctionDef extends Base {
   kind: 'FunctionDef';
+  /** Runs without yielding at loop ends (Scratch "run without screen refresh"). */
+  warp?: boolean;
   name: string;
   params: string[];
   body: Block;

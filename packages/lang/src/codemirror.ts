@@ -20,7 +20,7 @@ export const stitchLanguage = LRLanguage.define({
   parser: parser.configure({
     props: [
       styleTags({
-        'var global local function on do end return': t.definitionKeyword,
+        'var global local function warp on do end return': t.definitionKeyword,
         'if then elseif else forever repeat until while for in wait': t.controlKeyword,
         'start key message': t.keyword,
         'and or not': t.operatorKeyword,

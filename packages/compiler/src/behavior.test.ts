@@ -180,3 +180,73 @@ end`,
     expect(logs).toEqual(['alive']);
   });
 });
+
+describe('warp functions', () => {
+  it('run a whole loop in one tick, and normal functions do not', () => {
+    const { ticks, logs } = run({
+      P: `var n = 0
+warp function fill(k)
+  repeat k do
+    n += 1
+  end
+  count_to(k)
+end
+function count_to(k)
+  repeat k do
+    n += 1
+  end
+end
+function slow(k)
+  repeat k do
+    n += 1
+  end
+end
+on start do
+  fill(100)
+  print(n)
+  slow(3)
+  print(n)
+end`,
+    });
+    ticks(1);
+    // fill() and the count_to() it calls inherit warp: 200 increments in the first tick.
+    expect(logs).toEqual(['200']);
+    ticks(3);
+    expect(logs).toEqual(['200', '203']);
+  });
+
+  it('yields an endless warp loop once the tick is over budget', () => {
+    let clock = 0;
+    const project = projectFrom({
+      P: 'warp function spin()\n  forever do\n    x += 1\n  end\nend\non start do\n  spin()\nend',
+    });
+    const r = compile(project);
+    const world = new World({
+      stage: DEFAULT_STAGE,
+      sprites: [
+        {
+          id: 'P',
+          name: 'P',
+          x: 0,
+          y: 0,
+          direction: 90,
+          size: 100,
+          visible: true,
+          layer: 0,
+          costumes: [],
+          costume: 1,
+        },
+      ],
+      costumes: {},
+      now: () => (clock += 1), // every clock read advances 1 ms
+    });
+    world.load(new Function('rt', r.code) as Program);
+    world.start();
+    world.tick();
+    const after1 = world.all[0]!.x;
+    expect(after1).toBeGreaterThan(100);
+    expect(after1).toBeLessThan(1000);
+    world.tick();
+    expect(world.all[0]!.x).toBeGreaterThan(after1);
+  });
+});

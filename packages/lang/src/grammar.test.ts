@@ -155,6 +155,18 @@ end`);
     expect(m.trailing).toEqual({ comments: [' end of file'] });
   });
 
+  it('attaches comments inside bodies to the statement they precede', () => {
+    const m = ok(
+      'on start do\n  -- say hi\n  say("hi")\n  -- before end\nend\nfunction f()\n  -- in f\n  return\nend',
+    );
+    const ev = m.items[0]!;
+    expect(ev.trivia).toBeUndefined();
+    expect(firstStmts(m)[0]!.trivia).toEqual({ comments: [' say hi'] });
+    expect(ev.kind === 'EventScript' && ev.body.trailing).toEqual({ comments: [' before end'] });
+    const f = m.items[1]!;
+    expect(f.kind === 'FunctionDef' && f.body.stmts[0]!.trivia).toEqual({ comments: [' in f'] });
+  });
+
   it('reports positions for syntax errors', () => {
     const r = parse('on start do\n  x = = 2\nend');
     expect(r.diagnostics.length).toBeGreaterThan(0);

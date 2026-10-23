@@ -1,0 +1,18 @@
+{
+  "name": "@stitch/blocks",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./workspace": "./src/workspace.ts"
+  },
+  "dependencies": {
+    "@stitch/ir": "workspace:*",
+    "@blockly/field-multilineinput": "^13.4.0",
+    "blockly": "^13.4.0"
+  },
+  "devDependencies": {
+    "@stitch/lang": "workspace:*"
+  }
+}
