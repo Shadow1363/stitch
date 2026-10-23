@@ -1,0 +1,443 @@
+import {
+  getBuiltin,
+  stripIds,
+  type Block,
+  type Diagnostic,
+  type Expr,
+  type FunctionDef,
+  type Module,
+  type NodeId,
+  type Project,
+  type Stmt,
+  type ValueType,
+} from '@stitch/ir';
+
+/**
+ * IR -> JavaScript. Output targets the RuntimeApi in @stitch/runtime (core/world.ts):
+ *   rt.defineModule(id, (S, V, G) => { ...vars; function* f_name() {}; rt.on(S, event, arg, function* () {}) })
+ *   rt.instantiate({ spriteId: moduleId })
+ * Every loop iteration ends in `yield` (one iteration per tick). User functions are generators.
+ */
+
+type T = 'number' | 'string' | 'boolean' | 'any';
+
+interface Code {
+  js: string;
+  t: T;
+}
+
+export interface Emitted {
+  code: string;
+  /** lineMap[i] = IR node that produced line i (0-based) of `code`. */
+  lineMap: (NodeId | undefined)[];
+  diagnostics: Diagnostic[];
+}
+
+const ARITH: Record<string, string> = { '+': '+', '-': '-', '*': '*', '/': '/' };
+const CMP: Record<string, string> = { '<': '<', '<=': '<=', '>': '>', '>=': '>=' };
+const MATH_INLINE: Record<string, string> = {
+  abs: 'Math.abs',
+  floor: 'Math.floor',
+  ceil: 'Math.ceil',
+  round: 'Math.round',
+  sqrt: 'Math.sqrt',
+  min: 'Math.min',
+  max: 'Math.max',
+};
+
+const toT = (v: ValueType | undefined): T =>
+  v === 'number' || v === 'string' || v === 'boolean' ? v : 'any';
+
+class Writer {
+  lines: string[] = [];
+  map: (NodeId | undefined)[] = [];
+  private depth = 0;
+  line(text: string, id?: NodeId) {
+    this.lines.push('  '.repeat(this.depth) + text);
+    this.map.push(id);
+  }
+  indent() {
+    this.depth++;
+  }
+  dedent() {
+    this.depth--;
+  }
+}
+
+export function emitProject(
+  project: Project,
+  spriteOrder: string[] = project.sprites.map((s) => s.id),
+): Emitted {
+  const w = new Writer();
+  const diagnostics: Diagnostic[] = [];
+  const globals = new Set<string>();
+  const files = [
+    { id: '$stage', name: 'stage', module: project.stage },
+    ...project.sprites.map((s) => ({ id: s.id, name: s.name, module: s.module })),
+  ];
+  for (const f of files)
+    for (const it of f.module.items)
+      if (it.kind === 'VarDecl' && it.scope === 'global') globals.add(it.name);
+
+  w.line('"use strict";');
+  w.line('const $ = rt.ops, B = rt.b;');
+  // Identical modules (e.g. many copies of one sprite) share one factory.
+  const moduleIds = new Map<string, string>();
+  const instances: Record<string, string> = {};
+  for (const f of files) {
+    const key = JSON.stringify(stripIds(f.module));
+    let mid = moduleIds.get(key);
+    if (!mid) {
+      mid = `m${moduleIds.size}`;
+      moduleIds.set(key, mid);
+      new ModuleEmitter(w, f.module, globals, (d) => diagnostics.push({ ...d, file: f.name })).emit(
+        mid,
+      );
+    }
+    instances[f.id] = mid;
+  }
+  const ordered: Record<string, string> = { $stage: instances.$stage! };
+  for (const id of spriteOrder) if (instances[id]) ordered[id] = instances[id];
+  w.line(`rt.instantiate(${JSON.stringify(ordered)});`);
+  return { code: w.lines.join('\n'), lineMap: w.map, diagnostics };
+}
+
+class ModuleEmitter {
+  private spriteVars = new Set<string>();
+  private functions = new Set<string>();
+  private scopes: Map<string, string>[] = [];
+  private tmp = 0;
+
+  constructor(
+    private w: Writer,
+    private m: Module,
+    private globals: ReadonlySet<string>,
+    private report: (d: Diagnostic) => void,
+  ) {
+    for (const it of m.items) {
+      if (it.kind === 'VarDecl' && it.scope === 'sprite') this.spriteVars.add(it.name);
+      if (it.kind === 'FunctionDef') this.functions.add(it.name);
+    }
+  }
+
+  emit(mid: string) {
+    const w = this.w;
+    w.line(`rt.defineModule(${JSON.stringify(mid)}, function (S, V, G) {`);
+    w.indent();
+    for (const it of this.m.items) {
+      if (it.kind !== 'VarDecl') continue;
+      if (!this.pureInit(it.init)) {
+        this.report({
+          severity: 'error',
+          message: `variable '${it.name}' must start with a value that doesn't wait or call your functions`,
+          nodeId: it.id,
+        });
+        continue;
+      }
+      const v = this.expr(it.init).js;
+      if (it.scope === 'global')
+        w.line(`if (!(${JSON.stringify(it.name)} in G)) G.${it.name} = ${v};`, it.id);
+      else w.line(`V.${it.name} = ${v};`, it.id);
+    }
+    for (const it of this.m.items) if (it.kind === 'FunctionDef') this.fn(it);
+    for (const it of this.m.items) {
+      if (it.kind !== 'EventScript') continue;
+      const ev = it.event;
+      const arg =
+        ev.type === 'key'
+          ? JSON.stringify(ev.key.toLowerCase())
+          : ev.type === 'message'
+            ? JSON.stringify(ev.name)
+            : 'null';
+      w.line(`rt.on(S, ${JSON.stringify(ev.type)}, ${arg}, function* () {`, it.id);
+      this.block(it.body);
+      w.line('});');
+    }
+    w.dedent();
+    w.line('});');
+  }
+
+  private fn(f: FunctionDef) {
+    this.scopes = [new Map(f.params.map((p) => [p, `l_${p}`]))];
+    this.w.line(`function* f_${f.name}(${f.params.map((p) => `l_${p}`).join(', ')}) {`, f.id);
+    this.block(f.body);
+    this.w.line('}');
+    this.scopes = [];
+  }
+
+  /** Initialisers run once at load, outside any thread: no waiting, no user functions. */
+  private pureInit(e: Expr): boolean {
+    if (e.kind === 'Call') {
+      const b = getBuiltin(e.name);
+      if (!b || b.yields) return false;
+    }
+    const kids: Expr[] =
+      e.kind === 'List'
+        ? e.items
+        : e.kind === 'Call'
+          ? e.args
+          : e.kind === 'Index'
+            ? [e.target, e.index]
+            : e.kind === 'Unary'
+              ? [e.operand]
+              : e.kind === 'Binary'
+                ? [e.left, e.right]
+                : [];
+    return kids.every((k) => this.pureInit(k));
+  }
+
+  // ---- statements ----
+
+  private block(b: Block, loopVar?: { name: string; js: string }) {
+    this.w.indent();
+    const scope = new Map<string, string>();
+    if (loopVar) scope.set(loopVar.name, loopVar.js);
+    this.scopes.push(scope);
+    for (const s of b.stmts) this.stmt(s, scope);
+    this.scopes.pop();
+    this.w.dedent();
+  }
+
+  private loopBody(b: Block, loopVar?: { name: string; js: string }) {
+    this.block(b, loopVar);
+    this.w.indent();
+    this.w.line('yield;');
+    this.w.dedent();
+  }
+
+  private stmt(s: Stmt, scope: Map<string, string>) {
+    const w = this.w;
+    switch (s.kind) {
+      case 'Raw':
+        w.line(`throw new SyntaxError(${JSON.stringify(s.error)});`, s.id);
+        return;
+      case 'LocalDecl': {
+        const js = `l_${s.name}`;
+        const v = this.expr(s.init).js;
+        if (scope.has(s.name)) w.line(`${js} = ${v};`, s.id);
+        else w.line(`let ${js} = ${v};`, s.id);
+        scope.set(s.name, js);
+        return;
+      }
+      case 'Assign':
+        return this.assign(s);
+      case 'CallStmt': {
+        const c = this.expr(s.call).js;
+        w.line(`${c.startsWith('(yield*') ? c.slice(1, -1) : c};`, s.id);
+        return;
+      }
+      case 'If': {
+        w.line(`if (${this.bool(s.cond)}) {`, s.id);
+        this.block(s.then);
+        for (const e of s.elifs) {
+          w.line(`} else if (${this.bool(e.cond)}) {`, e.id);
+          this.block(e.body);
+        }
+        if (s.else) {
+          w.line('} else {');
+          this.block(s.else);
+        }
+        w.line('}');
+        return;
+      }
+      case 'Forever':
+        w.line('while (true) {', s.id);
+        this.loopBody(s.body);
+        w.line('}');
+        return;
+      case 'Repeat': {
+        const i = this.temp('i');
+        const n = this.temp('n');
+        w.line(
+          `for (let ${i} = 0, ${n} = Math.round(${this.num(s.count)}); ${i} < ${n}; ${i}++) {`,
+          s.id,
+        );
+        this.loopBody(s.body);
+        w.line('}');
+        return;
+      }
+      case 'RepeatUntil':
+        w.line(`while (!${this.bool(s.cond)}) {`, s.id);
+        this.loopBody(s.body);
+        w.line('}');
+        return;
+      case 'While':
+        w.line(`while (${this.bool(s.cond)}) {`, s.id);
+        this.loopBody(s.body);
+        w.line('}');
+        return;
+      case 'ForRange': {
+        const c = this.temp('c');
+        const e = this.temp('e');
+        const st = this.temp('s');
+        const step = s.step ? this.num(s.step) : '1';
+        w.line(
+          `for (let ${c} = ${this.num(s.from)}, ${e} = ${this.num(s.to)}, ${st} = ${step}; ${st} >= 0 ? ${c} <= ${e} : ${c} >= ${e}; ${c} += ${st}) {`,
+          s.id,
+        );
+        w.indent();
+        w.line(`let l_${s.var} = ${c};`);
+        w.dedent();
+        this.loopBody(s.body, { name: s.var, js: `l_${s.var}` });
+        w.line('}');
+        return;
+      }
+      case 'ForEach': {
+        const v = this.temp('v');
+        w.line(`for (const ${v} of $.iter(${this.expr(s.list).js})) {`, s.id);
+        w.indent();
+        w.line(`let l_${s.var} = ${v};`);
+        w.dedent();
+        this.loopBody(s.body, { name: s.var, js: `l_${s.var}` });
+        w.line('}');
+        return;
+      }
+      case 'WaitUntil':
+        w.line(`while (!${this.bool(s.cond)}) yield;`, s.id);
+        return;
+      case 'Return':
+        w.line(s.value ? `return ${this.expr(s.value).js};` : 'return "";', s.id);
+        return;
+    }
+  }
+
+  private assign(s: Extract<Stmt, { kind: 'Assign' }>) {
+    const w = this.w;
+    const t = s.target;
+    const op = s.op === '=' ? undefined : s.op[0]!;
+    if (t.kind === 'Prop') {
+      const v = this.num(s.value);
+      w.line(op ? `S.${t.prop} ${op}= ${v};` : `S.${t.prop} = ${v};`, s.id);
+      return;
+    }
+    if (t.kind === 'Var') {
+      const ref = this.varRef(t.name);
+      if (!op) w.line(`${ref} = ${this.expr(s.value).js};`, s.id);
+      else w.line(`${ref} = $.n(${ref}) ${op} ${this.num(s.value)};`, s.id);
+      return;
+    }
+    const target = this.expr(t.target).js;
+    const index = this.expr(t.index).js;
+    if (!op) {
+      w.line(`$.setIndex(${target}, ${index}, ${this.expr(s.value).js});`, s.id);
+      return;
+    }
+    const a = this.temp('t');
+    const b = this.temp('k');
+    w.line(
+      `{ const ${a} = ${target}, ${b} = ${index}; $.setIndex(${a}, ${b}, $.n($.index(${a}, ${b})) ${op} ${this.num(s.value)}); }`,
+      s.id,
+    );
+  }
+
+  private temp(prefix: string): string {
+    return `$${prefix}${++this.tmp}`;
+  }
+
+  private varRef(name: string): string {
+    for (let i = this.scopes.length - 1; i >= 0; i--) {
+      const js = this.scopes[i]!.get(name);
+      if (js) return js;
+    }
+    if (this.spriteVars.has(name)) return `V.${name}`;
+    if (this.globals.has(name)) return `G.${name}`;
+    // Validation reports unknown names; keep emitting so the line map stays useful.
+    return `V.${name}`;
+  }
+
+  // ---- expressions ----
+
+  private num(e: Expr): string {
+    const c = this.expr(e);
+    return c.t === 'number' ? c.js : `$.n(${c.js})`;
+  }
+
+  private bool(e: Expr): string {
+    const c = this.expr(e);
+    return c.t === 'boolean' ? c.js : `$.b(${c.js})`;
+  }
+
+  private str(e: Expr): string {
+    const c = this.expr(e);
+    return c.t === 'string' ? c.js : `$.s(${c.js})`;
+  }
+
+  private expr(e: Expr): Code {
+    switch (e.kind) {
+      case 'Num':
+        return {
+          js:
+            e.value < 0 || Object.is(e.value, -0)
+              ? `(${String(e.value === 0 ? '-0' : e.value)})`
+              : String(e.value),
+          t: 'number',
+        };
+      case 'Str':
+        return { js: JSON.stringify(e.value), t: 'string' };
+      case 'Bool':
+        return { js: String(e.value), t: 'boolean' };
+      case 'List':
+        return { js: `[${e.items.map((i) => this.expr(i).js).join(', ')}]`, t: 'any' };
+      case 'Var':
+        return { js: this.varRef(e.name), t: 'any' };
+      case 'Prop':
+        return { js: `S.${e.prop}`, t: 'number' };
+      case 'Index':
+        return { js: `$.index(${this.expr(e.target).js}, ${this.expr(e.index).js})`, t: 'any' };
+      case 'Unary':
+        return e.op === '-'
+          ? { js: `(-${this.num(e.operand)})`, t: 'number' }
+          : { js: `!${this.bool(e.operand)}`, t: 'boolean' };
+      case 'Binary':
+        return this.binary(e);
+      case 'Call':
+        return this.call(e);
+    }
+  }
+
+  private binary(e: Extract<Expr, { kind: 'Binary' }>): Code {
+    const op = e.op;
+    if (ARITH[op])
+      return { js: `(${this.num(e.left)} ${ARITH[op]} ${this.num(e.right)})`, t: 'number' };
+    if (op === '%')
+      return { js: `$.mod(${this.expr(e.left).js}, ${this.expr(e.right).js})`, t: 'number' };
+    if (op === '^')
+      return { js: `Math.pow(${this.num(e.left)}, ${this.num(e.right)})`, t: 'number' };
+    if (op === '..') return { js: `(${this.str(e.left)} + ${this.str(e.right)})`, t: 'string' };
+    if (op === 'and' || op === 'or')
+      return {
+        js: `(${this.bool(e.left)} ${op === 'and' ? '&&' : '||'} ${this.bool(e.right)})`,
+        t: 'boolean',
+      };
+    const l = this.expr(e.left);
+    const r = this.expr(e.right);
+    const nums = l.t === 'number' && r.t === 'number';
+    if (op === '==' || op === '~=') {
+      const js = nums
+        ? `(${l.js} ${op === '==' ? '===' : '!=='} ${r.js})`
+        : `${op === '==' ? '' : '!'}$.eq(${l.js}, ${r.js})`;
+      return { js, t: 'boolean' };
+    }
+    return {
+      js: nums ? `(${l.js} ${CMP[op]} ${r.js})` : `($.cmp(${l.js}, ${r.js}) ${CMP[op]} 0)`,
+      t: 'boolean',
+    };
+  }
+
+  private call(e: Extract<Expr, { kind: 'Call' }>): Code {
+    if (this.functions.has(e.name))
+      return {
+        js: `(yield* f_${e.name}(${e.args.map((a) => this.expr(a).js).join(', ')}))`,
+        t: 'any',
+      };
+    const b = getBuiltin(e.name);
+    if (!b) return { js: `B.${e.name}()`, t: 'any' };
+    const inline = MATH_INLINE[e.name];
+    if (inline)
+      return { js: `${inline}(${e.args.map((a) => this.num(a)).join(', ')})`, t: 'number' };
+    const args = e.args.map((a) => this.expr(a).js);
+    if (b.sprite) args.unshift('S');
+    const js = `B.${e.name}(${args.join(', ')})`;
+    return { js: b.yields ? `(yield* ${js})` : js, t: toT(b.returns) };
+  }
+}

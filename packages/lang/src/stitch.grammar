@@ -1,0 +1,120 @@
+// Stitch language grammar. Regenerate the parser with `pnpm gen` after editing.
+// Every construct has exactly one spelling so text maps 1:1 to blocks.
+
+@precedence {
+  call,
+  pow @right,
+  prefix,
+  times @left,
+  plus @left,
+  concat @right,
+  compare @left,
+  and @left,
+  or @left
+}
+
+@top Module { item* }
+
+item { VarDecl | FunctionDef | EventScript }
+
+VarDecl { kw<"global">? kw<"var"> Name "=" expr }
+
+FunctionDef { kw<"function"> Name ParamList Body kw<"end"> }
+
+ParamList { "(" commaSep<Name> ")" }
+
+EventScript { kw<"on"> event kw<"do"> Body kw<"end"> }
+
+event { StartEvent | KeyEvent | MessageEvent }
+StartEvent { ckw<"start"> }
+KeyEvent { ckw<"key"> String }
+MessageEvent { ckw<"message"> String }
+
+// `return` may only end a block (as in Lua), which keeps `return` + newline unambiguous.
+Body { statement* Return? }
+
+statement {
+  LocalDecl | Assign | CallStmt | If | Forever | Repeat | RepeatUntil |
+  While | ForRange | ForEach | WaitUntil
+}
+
+LocalDecl { kw<"local"> Name "=" expr }
+
+Assign { (Name | IndexTarget) AssignOp expr }
+
+// Assignment through indexes: `grid[2][3] = 1`. Only names can be indexed here.
+IndexTarget { Name ("[" expr "]")+ }
+
+AssignOp { "=" | "+=" | "-=" | "*=" | "/=" }
+
+CallStmt { CallExpr }
+
+If { kw<"if"> expr kw<"then"> Body ElseIf* Else? kw<"end"> }
+ElseIf { kw<"elseif"> expr kw<"then"> Body }
+Else { kw<"else"> Body }
+
+Forever { kw<"forever"> kw<"do"> Body kw<"end"> }
+
+Repeat { kw<"repeat"> expr kw<"do"> Body kw<"end"> }
+
+RepeatUntil { kw<"repeat"> kw<"until"> expr kw<"do"> Body kw<"end"> }
+
+While { kw<"while"> expr kw<"do"> Body kw<"end"> }
+
+ForRange { kw<"for"> Name "=" expr "," expr ("," expr)? kw<"do"> Body kw<"end"> }
+
+ForEach { kw<"for"> Name kw<"in"> expr kw<"do"> Body kw<"end"> }
+
+WaitUntil { ckw<"wait"> kw<"until"> expr }
+
+Return { kw<"return"> expr? }
+
+expr {
+  Number | String | Boolean | ListLit | Name | CallExpr | IndexExpr |
+  ParenExpr | UnaryExpr | BinaryExpr
+}
+
+Boolean { kw<"true"> | kw<"false"> }
+
+CallExpr { Name ArgList }
+
+ArgList { "(" commaSep<expr> ")" }
+
+IndexExpr { expr !call "[" expr "]" }
+
+ListLit { "[" commaSep<expr> "]" }
+
+ParenExpr { "(" expr ")" }
+
+UnaryExpr { !prefix (kw<"not"> | "-") expr }
+
+BinaryExpr {
+  expr !pow "^" expr |
+  expr !times ("*" | "/" | "%") expr |
+  expr !plus ("+" | "-") expr |
+  expr !concat ".." expr |
+  expr !compare ("==" | "~=" | "<" | "<=" | ">" | ">=") expr |
+  expr !and kw<"and"> expr |
+  expr !or kw<"or"> expr
+}
+
+commaSep<x> { (x ("," x)*)? }
+
+kw<term> { @specialize[@name={term}]<Name, term> }
+
+// Contextual keyword: also usable as a plain name (e.g. `wait(1)`, `var key`).
+ckw<term> { @extend[@name={term}]<Name, term> }
+
+@skip { space | LineComment }
+
+@tokens {
+  Name { $[a-zA-Z_] $[a-zA-Z0-9_]* }
+  Number { @digit+ ("." @digit+)? }
+  String { '"' (![\\\n"] | "\\" _)* '"' }
+  LineComment { "--" ![\n]* }
+  space { @whitespace+ }
+  @precedence { LineComment, "-=", "-" }
+  "(" ")" "[" "]" ","
+}
+
+@detectDelim

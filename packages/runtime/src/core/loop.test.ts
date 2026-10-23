@@ -1,0 +1,40 @@
+import { describe, expect, it } from 'vitest';
+import { createLoop, MAX_TICKS_PER_FRAME, TICK_MS } from './loop';
+
+const loop = () => {
+  const counts = { ticks: 0, renders: 0 };
+  const l = createLoop({
+    tick: () => counts.ticks++,
+    render: () => counts.renders++,
+    requestFrame: () => 1,
+    cancelFrame: () => {},
+  });
+  return { l, counts };
+};
+
+describe('fixed-timestep loop', () => {
+  it('runs one tick per 60 Hz frame despite jitter', () => {
+    const { l, counts } = loop();
+    let t = 0;
+    for (let i = 0; i < 120; i++) {
+      t += TICK_MS + (i % 2 ? 0.6 : -0.6);
+      expect(l.frame(t)).toBe(1);
+    }
+    expect(counts).toEqual({ ticks: 120, renders: 120 });
+  });
+
+  it('ticks every other frame at 120 Hz', () => {
+    const { l, counts } = loop();
+    let t = 0;
+    for (let i = 0; i < 120; i++) l.frame((t += TICK_MS / 2));
+    expect(counts.ticks).toBeGreaterThanOrEqual(59);
+    expect(counts.ticks).toBeLessThanOrEqual(61);
+  });
+
+  it('caps catch-up after a long frame and drops the rest', () => {
+    const { l } = loop();
+    l.frame(0);
+    expect(l.frame(1000)).toBe(MAX_TICKS_PER_FRAME);
+    expect(l.frame(1000 + TICK_MS)).toBe(1);
+  });
+});

@@ -1,0 +1,41 @@
+-- Arrow keys steer the ball; it bounces off the stage edges.
+var vx = 3
+var vy = 2
+
+on start do
+  goto(0, 0)
+  say_for("Use the arrow keys!", 2)
+end
+
+on start do
+  forever do
+    if key_down("left") then
+      vx -= 0.5
+    end
+    if key_down("right") then
+      vx += 0.5
+    end
+    if key_down("up") then
+      vy += 0.5
+    end
+    if key_down("down") then
+      vy -= 0.5
+    end
+    x += vx
+    y += vy
+    local edge = on_edge() -- "left", "right", "top", "bottom" or ""
+    if edge == "left" or edge == "right" then
+      vx = -vx
+    end
+    if edge == "top" or edge == "bottom" then
+      vy = -vy
+    end
+    clamp_to_stage()
+  end
+end
+
+on key "space" do
+  vx = 0
+  vy = 0
+  say_for("Stop!", 1)
+end

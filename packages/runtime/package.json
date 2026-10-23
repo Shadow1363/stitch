@@ -1,0 +1,21 @@
+{
+  "name": "@stitch/runtime",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./pixi": "./src/pixi/index.ts",
+    "./host": "./src/host.ts",
+    "./bridge": "./src/bridge.ts",
+    "./protocol": "./src/protocol.ts",
+    "./stats": "./src/stats.ts"
+  },
+  "dependencies": {
+    "@stitch/cart": "workspace:*",
+    "pixi.js": "^8.22.0"
+  },
+  "devDependencies": {
+    "@stitch/ir": "workspace:*"
+  }
+}

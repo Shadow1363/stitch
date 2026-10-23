@@ -1,0 +1,4 @@
+{
+  "extends": "./tsconfig.base.json",
+  "include": ["packages/ir/src", "packages/lang/src", "packages/cart/src", "packages/runtime/src", "packages/compiler/src", "vitest.config.ts", "vitest.browser.config.ts"]
+}

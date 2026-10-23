@@ -1,0 +1,9 @@
+{
+  "name": "@stitch/compiler",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@stitch/ir": "workspace:*" },
+  "devDependencies": { "@stitch/runtime": "workspace:*", "@stitch/lang": "workspace:*", "@stitch/cart": "workspace:*" }
+}

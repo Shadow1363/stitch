@@ -1,0 +1,3 @@
+pnpm-lock.yaml
+packages/lang/src/parser.gen.js
+packages/lang/src/parser.gen.terms.js

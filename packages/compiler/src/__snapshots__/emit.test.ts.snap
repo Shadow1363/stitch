@@ -1,0 +1,61 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`emit > compiles loops, functions and waits 1`] = `
+""use strict";
+const $ = rt.ops, B = rt.b;
+rt.defineModule("m0", function (S, V, G) {
+});
+rt.defineModule("m1", function (S, V, G) {
+  V.items = [1, 2];
+  function* f_fact(l_n) {
+    if (($.cmp(l_n, 1) <= 0)) {
+      return 1;
+    }
+    return ($.n(l_n) * $.n((yield* f_fact(($.n(l_n) - 1)))));
+  }
+  rt.on(S, "message", "go", function* () {
+    for (let $i1 = 0, $n2 = Math.round(3); $i1 < $n2; $i1++) {
+      yield* B.say_for(S, ($.s((yield* f_fact(3))) + "!"), 1);
+      yield;
+    }
+    for (let $c3 = 10, $e4 = 1, $s5 = (-1); $s5 >= 0 ? $c3 <= $e4 : $c3 >= $e4; $c3 += $s5) {
+      let l_i = $c3;
+      { const $t6 = V.items, $k7 = 1; $.setIndex($t6, $k7, $.n($.index($t6, $k7)) + $.n(l_i)); }
+      yield;
+    }
+    for (const $v8 of $.iter(V.items)) {
+      let l_it = $v8;
+      B.print(l_it);
+      yield;
+    }
+    while (!(B.timer() > 2)) yield;
+    yield* B.wait(0.5);
+  });
+});
+rt.instantiate({"$stage":"m0","P":"m1"});"
+`;
+
+exports[`emit > compiles the sample game 1`] = `
+""use strict";
+const $ = rt.ops, B = rt.b;
+rt.defineModule("m0", function (S, V, G) {
+});
+rt.defineModule("m1", function (S, V, G) {
+  V.vx = 3;
+  rt.on(S, "start", null, function* () {
+    while (true) {
+      if (B.key_down("left")) {
+        V.vx = $.n(V.vx) - 0.5;
+      }
+      S.x += $.n(V.vx);
+      let l_edge = B.on_edge(S);
+      if (($.eq(l_edge, "left") || $.eq(l_edge, "right"))) {
+        V.vx = (-$.n(V.vx));
+      }
+      B.clamp_to_stage(S);
+      yield;
+    }
+  });
+});
+rt.instantiate({"$stage":"m0","P":"m1"});"
+`;

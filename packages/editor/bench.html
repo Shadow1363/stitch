@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Stitch benchmark</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #111; color: #eee; font: 13px ui-monospace, monospace; }
+      #stage { position: absolute; inset: 0; }
+      #hud { position: absolute; left: 8px; top: 8px; background: #000c; padding: 8px 10px; border-radius: 6px; white-space: pre; pointer-events: none; }
+    </style>
+  </head>
+  <body>
+    <div id="stage"></div>
+    <div id="hud">starting…</div>
+    <script type="module" src="/src/bench/main.ts"></script>
+  </body>
+</html>
