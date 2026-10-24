@@ -86,6 +86,7 @@ export default defineConfig({
         main: resolve(import.meta.dirname, 'index.html'),
         stage: resolve(import.meta.dirname, 'stage.html'),
         bench: resolve(import.meta.dirname, 'bench.html'),
+        docs: resolve(import.meta.dirname, 'docs.html'),
       },
     },
   },

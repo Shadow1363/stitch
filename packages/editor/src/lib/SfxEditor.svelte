@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Play, Redo2, Trash2, Undo2 } from '@lucide/svelte';
   import SplitPane from './SplitPane.svelte';
   import { DEFAULT_SFX, SFX_PARAMS, SFX_PRESETS, SFX_WAVES, sfxMutate, sfxPreset, sfxRandomize, type SfxParams, type SfxPreset, type Sound } from '@stitch/cart';
   import { encodeWav, SFX_RATE } from '@stitch/cart/audio';
@@ -155,7 +156,7 @@
           {#each list as s (s.id)}
             <li class:sel={s.id === currentId}>
               <button class="pick" onclick={() => (selectedId = s.id)}>{s.name}</button>
-              <button class="play" aria-label="Play {s.name}" onclick={() => { selectedId = s.id; queueMicrotask(play); }}>▶</button>
+              <button class="play" aria-label="Play {s.name}" onclick={() => { selectedId = s.id; queueMicrotask(play); }}><Play /></button>
             </li>
           {:else}
             <li class="muted">No sounds yet. Pick a kind above.</li>
@@ -168,7 +169,7 @@
         <div class="edit">
           <div class="bar">
             <input class="name" type="text" value={current.name} onchange={(e) => rename((e.target as HTMLInputElement).value)} aria-label="Sound name" title="Scripts play it by this name" />
-            <button class="go" onclick={play} title="Play (Space)">▶ Play</button>
+            <button class="go" onclick={play} title="Play (Space)"><Play />Play</button>
             <span class="gap"></span>
             {#each SFX_PRESETS as p (p)}
               <button onclick={() => setParams(sfxPreset(p, seed()))} title="Replace with a new {p} sound">{label(p)}</button>
@@ -177,10 +178,10 @@
             <button onclick={() => setParams(sfxMutate(current.params, seed()))} title="Small random changes">Mutate</button>
             <button onclick={() => setParams({ ...sfxRandomize(seed()), volume: current.params.volume })}>Randomize</button>
             <span class="gap"></span>
-            <button onclick={() => step(undoStack, redoStack)} title="Undo (⌘Z)">↶</button>
-            <button onclick={() => step(redoStack, undoStack)} title="Redo (⇧⌘Z)">↷</button>
+            <button onclick={() => step(undoStack, redoStack)} title="Undo (⌘Z)" aria-label="Undo"><Undo2 /></button>
+            <button onclick={() => step(redoStack, undoStack)} title="Redo (⇧⌘Z)" aria-label="Redo"><Redo2 /></button>
             <button onclick={exportWav}>Export WAV</button>
-            <button onclick={remove} title="Delete sound">🗑</button>
+            <button onclick={remove} title="Delete sound" aria-label="Delete sound"><Trash2 /></button>
           </div>
           <div class="wave-row">
             <div class="seg" role="radiogroup" aria-label="Wave">

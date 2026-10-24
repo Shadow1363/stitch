@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Circle, Crosshair, MousePointer2, PenTool, RectangleHorizontal, Redo2, Slash, Trash2, Undo2 } from '@lucide/svelte';
   import type { SvgAsset } from '@stitch/cart';
   import { svgSize } from '@stitch/cart/render';
   import paper from 'paper/dist/paper-core';
@@ -12,13 +13,13 @@
   let { asset, onchange }: Props = $props();
 
   type Tool = 'select' | 'pen' | 'rect' | 'ellipse' | 'line' | 'center';
-  const TOOLS: { id: Tool; label: string; key: string }[] = [
-    { id: 'select', label: '➤ Select', key: 'v' },
-    { id: 'pen', label: '✎ Pen', key: 'p' },
-    { id: 'rect', label: '▭ Rect', key: 'r' },
-    { id: 'ellipse', label: '◯ Ellipse', key: 'o' },
-    { id: 'line', label: '╱ Line', key: 'l' },
-    { id: 'center', label: '✛ Center', key: 'c' },
+  const TOOLS: { id: Tool; label: string; key: string; icon: typeof PenTool }[] = [
+    { id: 'select', label: 'Select', key: 'v', icon: MousePointer2 },
+    { id: 'pen', label: 'Pen', key: 'p', icon: PenTool },
+    { id: 'rect', label: 'Rect', key: 'r', icon: RectangleHorizontal },
+    { id: 'ellipse', label: 'Ellipse', key: 'o', icon: Circle },
+    { id: 'line', label: 'Line', key: 'l', icon: Slash },
+    { id: 'center', label: 'Center', key: 'c', icon: Crosshair },
   ];
 
   let tool = $state<Tool>('rect');
@@ -224,12 +225,12 @@
 <div class="art-editor vector" tabindex="-1" onkeydown={onKey} role="application" aria-label="Vector editor">
   <div class="tools" role="toolbar">
     {#each TOOLS as t (t.id)}
-      <button class:on={tool === t.id} title="{t.label} ({t.key.toUpperCase()})" onclick={() => (tool = t.id)}>{t.label}</button>
+      <button class:on={tool === t.id} title="{t.label} ({t.key.toUpperCase()})" onclick={() => (tool = t.id)}><t.icon />{t.label}</button>
     {/each}
     <span class="gap"></span>
-    <button onclick={undo} title="Undo (⌘Z)">↶</button>
-    <button onclick={redo} title="Redo (⇧⌘Z)">↷</button>
-    <button onclick={remove} title="Delete selected (⌫)">🗑</button>
+    <button onclick={undo} title="Undo (⌘Z)" aria-label="Undo"><Undo2 /></button>
+    <button onclick={redo} title="Redo (⇧⌘Z)" aria-label="Redo"><Redo2 /></button>
+    <button onclick={remove} title="Delete selected (⌫)" aria-label="Delete selected"><Trash2 /></button>
     <span class="gap"></span>
     <label class="file">Import SVG<input type="file" accept=".svg,image/svg+xml" onchange={importFile} /></label>
     <button onclick={() => download(new Blob([asset.svg], { type: 'image/svg+xml' }), `${asset.name}.svg`)}>Export SVG</button>

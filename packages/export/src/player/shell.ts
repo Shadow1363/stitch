@@ -4,6 +4,7 @@
  * styled here so the page needs nothing else.
  */
 import { LETTERBOX } from '@stitch/runtime';
+import { createElement, RotateCcw, X, type IconNode } from 'lucide';
 
 /**
  * The player's copy of the editor's design tokens (it can't load app.css): the dark theme's
@@ -59,6 +60,9 @@ export function installStyles(): void {
   style.textContent = CSS;
   document.head.appendChild(style);
 }
+
+/** A lucide icon as inline SVG (no request: players load nothing), labelled by its button. */
+const icon = (i: IconNode) => createElement(i, { width: 16, height: 16, 'aria-hidden': 'true' });
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -127,7 +131,7 @@ export function askHost(host: string): Promise<boolean> {
 let bar: HTMLDivElement | undefined;
 export function showError(text: string): void {
   bar?.remove();
-  const close = el('button', { textContent: '×', title: 'Dismiss' });
+  const close = el('button', { title: 'Dismiss', ariaLabel: 'Dismiss' }, icon(X));
   bar = el('div', { className: 'st-error', role: 'alert' }, text, close);
   close.onclick = () => bar?.remove();
   document.body.appendChild(bar);
@@ -135,11 +139,15 @@ export function showError(text: string): void {
 
 export function restartButton(onclick: () => void): void {
   document.body.appendChild(
-    el('button', {
-      className: 'st-btn st-quiet st-restart',
-      textContent: '↻',
-      title: 'Restart',
-      onclick,
-    }),
+    el(
+      'button',
+      {
+        className: 'st-btn st-quiet st-restart',
+        title: 'Restart',
+        ariaLabel: 'Restart',
+        onclick,
+      },
+      icon(RotateCcw),
+    ),
   );
 }

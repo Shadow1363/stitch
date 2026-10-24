@@ -27,7 +27,7 @@ pnpm install
 pnpm dev
 ```
 
-Open `http://localhost:5173`. The editor starts with a sample game: press **▶ Run** and use the arrow keys. **Cart → Samples** has bigger ones, with comments throughout for reading: **Stitch Dungeon**, a roguelike with procedurally generated floors, enemies as clones and a pen-drawn HUD and minimap; **Patch Hop**, a three-level platformer with tile collisions and stomping; and **Needle Storm**, a bullet hell against a three-phase boss. Then follow a tutorial:
+Open `http://localhost:5173`. The editor starts with a sample game: press **Run** and use the arrow keys. **Cart → Samples** has bigger ones, with comments throughout for reading: **Stitch Dungeon**, a roguelike with procedurally generated floors, enemies as clones and a pen-drawn HUD and minimap; **Patch Hop**, a three-level platformer with tile collisions and stomping; and **Needle Storm**, a bullet hell against a three-phase boss. Then follow a tutorial:
 
 - [Your first game, for Scratch users](docs/tutorials/first-game-scratch.md): blocks first.
 - [Your first game, for PICO-8 users](docs/tutorials/first-game-pico8.md): text first, with a tile map.

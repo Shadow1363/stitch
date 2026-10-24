@@ -19,7 +19,7 @@ Now (0, 0) is the top-left corner, y grows downwards, and the stage scales up in
 
 ## 2. Draw the explorer
 
-Open **Costumes**. **Sprite1** has a 16×16 circle in the pixel editor. Redraw it as you like with **✏️ Pencil**, **🪣 Fill** and the palette: it's PICO-8's palette, numbered from 1 (0 is transparent). The status line under the canvas shows the pixel under the pointer. **✛ Center** sets the costume's centre: the point that sits at the sprite's `x` and `y` and that it turns around.
+Open **Costumes**. **Sprite1** has a 16×16 circle in the pixel editor. Redraw it as you like with **Pencil**, **Fill** and the palette: it's PICO-8's palette, numbered from 1 (0 is transparent). The status line under the canvas shows the pixel under the pointer. **Center** sets the costume's centre: the point that sits at the sprite's `x` and `y` and that it turns around.
 
 ## 3. Make a map
 
@@ -93,7 +93,7 @@ Open **Sounds** and, under **New sound**, click **Blip**. That makes `blip1`, an
 
 ## 6. Run it
 
-Press **▶ Run**, click the stage, and walk around. Walls stop you; each stone you step on turns to grass and prints a gem count. Press **■ Stop** to stop, and **▶ Run** again to restart from the cart's starting state.
+Press **Run**, click the stage, and walk around. Walls stop you; each stone you step on turns to grass and prints a gem count. Press **Stop** to stop, and **Run** again to restart from the cart's starting state.
 
 ## 7. Save the cart
 

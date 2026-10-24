@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Download } from '@lucide/svelte';
   import { MAX_CLONE_LIMIT, type StageSettings } from '@stitch/cart';
   import type { Session } from './session';
   import { askText } from './dialog.svelte';
@@ -65,7 +66,7 @@
       /></label
     >
     <div class="row">
-      <button class="primary" onclick={onsave}>⬇ Save .stitch.png</button>
+      <button class="primary" onclick={onsave}><Download />Save .stitch.png</button>
       <label class="file">Open file…<input type="file" accept=".png,.json,image/png,application/json" onchange={(e) => { const f = (e.target as HTMLInputElement).files?.[0]; (e.target as HTMLInputElement).value = ''; if (f) onopen(f); }} /></label>
       <button onclick={openUrl}>Open URL…</button>
     </div>

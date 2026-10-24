@@ -284,7 +284,7 @@ async function setField(label: string, value: string, scope = page.locator('body
 /** Paints `rows` into the open pixel editor, one colour at a time, with the pencil. */
 async function paint(rows: string[]) {
   const canvas = page.locator('.art-editor canvas').first();
-  await button('✏️ Pencil').click();
+  await button('Pencil').click();
   const box = (await canvas.boundingBox())!;
   const cell = box.width / rows[0]!.length;
   const byColour = new Map<string, [number, number][]>();
@@ -301,7 +301,7 @@ async function paint(rows: string[]) {
 }
 
 async function addSprite(name: string) {
-  await button('＋ Sprite').click();
+  await button('Sprite').click();
   await fileTab('Sprite1').dblclick();
   await dialog(name);
 }
@@ -335,7 +335,7 @@ try {
     await tab('Costumes');
     await page.getByTitle('New pixel costume size').selectOption('8');
     for (const [name, rows] of Object.entries(costumes)) {
-      await button('＋ Pixel').click();
+      await button('Pixel').click();
       await setField('Costume name', name);
       await paint(rows);
     }
@@ -350,8 +350,8 @@ try {
   await button('Create map').click();
   const mapper = page.locator('.mapper');
   await setField('Height', '20', mapper);
-  await button('＋ Tile').click();
-  await button('＋ Tile').click();
+  await button('Tile').click();
+  await button('Tile').click();
   await button('Edit tileset').click();
   await paint(Array.from({ length: 8 }, (_, y) => TILESET.map((t) => t[y]).join('')));
   await button('Done editing tiles').click();

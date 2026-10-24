@@ -18,6 +18,7 @@ Architecture rules, stack and conventions are in [`CLAUDE.md`](../CLAUDE.md). De
 | 10    | Sample game: Stitch Dungeon | ✅ Done (awaiting review) |
 | 11    | Code editor tooling        | ✅ Done (awaiting review) |
 | 12    | Sample games: Patch Hop and Needle Storm | ✅ Done (awaiting review) |
+| 13    | Editor chrome: docs, icons, pause, full screen | ✅ Done (awaiting review) |
 
 **Performance targets:** 1,000 moving sprites at 60 fps on a mid-range laptop. Editor first load under 2 s on broadband. Runtime-only export bundle under 500 KB gzipped (172 KB at Phase 6, enforced in CI).
 
@@ -476,6 +477,25 @@ Known gaps:
 
 - The platformer's levels are single screens: the map is anchored to the stage, so there's no scrolling camera.
 - Needle Storm's bot doesn't dodge (the test gives it extra lives), so fairness is judged by pattern density rather than proven by play. A non-dodging bot took 27 hits over a 105 s fight with the original 900 HP. HP is now 600.
+
+## Phase 13 — Editor chrome: docs, icons, pause, full screen ✅
+
+- **Docs in the editor** (`docs.html`, `editor/src/docs/`): every markdown file under `docs/` plus the README and CONTRIBUTING, with their pictures, bundled at build time and rendered with `marked`.
+  - A sidebar groups the pages (Start, Reference, Project).
+  - Links between pages, anchors and block pictures resolve to the bundled copies. Links into source code show as plain text, since the code isn't bundled.
+  - The header's **Docs** button opens the reference in a new tab. Every hover and completion entry in the code editor has an **Open in the reference** link to its own entry.
+  - `pages.test.ts` checks that every page and link resolves.
+- **Pause** between Run and Stop: ticks and sound stop, the picture stays, keys pressed meanwhile are ignored, and Resume carries on from the same tick.
+  - `Loop.paused`, `StageRunner.setPaused`, a new `pause` message (`PROTOCOL_VERSION` 4).
+  - Checked in the browser: the tick count printed before and after a pause continues without a gap.
+- **Full-screen stage:** a button on the stage frame (Esc leaves). The game keeps the keyboard.
+- **Icons:** every emoji or symbol used as an icon is now a lucide icon (ISC): `@lucide/svelte` across the editor, `lucide` for the player's restart and dismiss buttons (+0.4 KB gzipped). Icon-only buttons have `aria-label`s. Tutorials, README and the dungeon build script use the plain labels.
+- The header got tighter to fit on one line: the theme button is icon-only, and the status text truncates first.
+
+Known gaps:
+
+- The docs page renders the architecture page's Mermaid diagram as code.
+- Docs pages reload on each link (no client-side routing).
 
 ## Open decisions (owner)
 

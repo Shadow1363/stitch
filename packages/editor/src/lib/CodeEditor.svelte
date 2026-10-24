@@ -120,6 +120,7 @@
     '.cm-stitch-blockrow': { margin: '6px 0 2px' },
     '.cm-stitch-block': { display: 'inline-block', padding: '2px 8px', borderRadius: '4px 10px 10px 4px', color: 'var(--on-block)', fontSize: '12px', fontWeight: '600' },
     '.cm-stitch-prose': { margin: '6px 0 0' },
+    '.cm-stitch-more': { display: 'inline-block', marginTop: '6px', color: 'var(--link)', fontSize: '12px' },
     '.cm-stitch-prose code, .cm-stitch-example': { fontFamily: 'var(--font-mono)', fontSize: '12px' },
     '.cm-stitch-example': { margin: '6px 0 0', padding: '6px 8px', background: 'var(--well)', borderRadius: 'var(--radius-s)', whiteSpace: 'pre', overflowX: 'auto' },
   });

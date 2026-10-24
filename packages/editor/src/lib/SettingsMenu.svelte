@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Settings } from '@lucide/svelte';
   import type { EditorSettings } from './settings';
 
   interface Props {
@@ -20,7 +21,7 @@
 <svelte:window onpointerdown={onWindowPointer} onkeydown={(e) => open && e.key === 'Escape' && (open = false)} />
 
 <div class="settings" bind:this={root}>
-  <button onclick={() => (open = !open)} aria-expanded={open} aria-haspopup="true" aria-label="Editor settings" title="Editor settings">⚙</button>
+  <button onclick={() => (open = !open)} aria-expanded={open} aria-haspopup="true" aria-label="Editor settings" title="Editor settings"><Settings /></button>
   {#if open}
     <div class="menu" role="group" aria-label="Editor settings">
       <label><input type="checkbox" checked={settings.formatOnSave} onchange={(e) => set('formatOnSave', e.currentTarget.checked)} /> Format code when saving the cart</label>

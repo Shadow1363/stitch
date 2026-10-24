@@ -94,8 +94,8 @@ The variable blocks are in **Variables**, **wait until** in **Control**, **broad
 
 ## 5. Add the coin
 
-1. Click **＋ Sprite**. The new sprite gets the first free name, **Sprite1** again; double-click its tab and rename it `Coin`.
-2. Open the **Costumes** tab. The coin's costume is a red circle in the pixel editor. Pick **🪣 Fill**, click the yellow swatch (colour 11) in the palette, and click inside the circle.
+1. Click **Sprite** (the button with a plus). The new sprite gets the first free name, **Sprite1** again; double-click its tab and rename it `Coin`.
+2. Open the **Costumes** tab. The coin's costume is a red circle in the pixel editor. Pick **Fill**, click the yellow swatch (colour 11) in the palette, and click inside the circle.
 3. Back on **Code**, give the coin this script:
 
 <!-- example: tut-scratch-coin -->
@@ -125,7 +125,7 @@ Open the **Sounds** tab. Under **New sound**, click **Coin**. Stitch makes a sou
 
 ## 7. Play
 
-Press **▶ Run** at the top. Click the stage so it gets the keyboard, then chase coins with the arrow keys. After 20 seconds the coin disappears, the player says your score, and the **Console** shows it.
+Press **Run** at the top. Click the stage so it gets the keyboard, then chase coins with the arrow keys. After 20 seconds the coin disappears, the player says your score, and the **Console** shows it.
 
 If something's wrong, **Problems** and the **Console** link to the line that caused it: click the link to jump there.
 

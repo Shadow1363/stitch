@@ -54,6 +54,14 @@ function describedView(d: Described): HTMLElement {
   if (d.blockText) root.append(el('div', 'cm-stitch-blockrow', blockPill(d.blockText, d.colour)));
   if (d.doc) root.append(prose(d.doc));
   if (d.example) root.append(el('pre', 'cm-stitch-example', d.example));
+  if (d.anchor) {
+    // The bundled docs page (docs.html), at this entry.
+    const a = el('a', 'cm-stitch-more', 'Open in the reference');
+    a.href = `docs.html?page=docs%2Freference.md#${d.anchor}`;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    root.append(a);
+  }
   return root;
 }
 

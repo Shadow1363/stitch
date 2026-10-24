@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ArrowLeft, ArrowRight, Copy, Plus, Trash2 } from '@lucide/svelte';
   import { blankImage, encodeLayers, quantize, type Asset, type PixelAsset, type SvgAsset } from '@stitch/cart';
   import { renderAsset, svgSize } from '@stitch/cart/render';
   import type { Component } from 'svelte';
@@ -157,14 +158,14 @@
       <select bind:value={newSize} title="New pixel costume size">
         {#each [8, 16, 32, 64, 128] as n (n)}<option value={n}>{n}×{n}</option>{/each}
       </select>
-      <button onclick={addPixel}>＋ Pixel</button>
-      <button onclick={addVector}>＋ Vector</button>
+      <button onclick={addPixel}><Plus />Pixel</button>
+      <button onclick={addVector}><Plus />Vector</button>
       <label class="file">Import…<input type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml,.svg" onchange={importFile} /></label>
       <span class="gap"></span>
-      <button onclick={duplicate} disabled={!current} title="Copy this costume as the next frame">⧉ Duplicate</button>
-      <button onclick={() => moveBy(-1)} disabled={selected === 0} title="Move earlier">←</button>
-      <button onclick={() => moveBy(1)} disabled={selected >= costumeIds.length - 1} title="Move later">→</button>
-      <button onclick={remove} disabled={costumeIds.length < 2} title="Delete costume">🗑</button>
+      <button onclick={duplicate} disabled={!current} title="Copy this costume as the next frame"><Copy />Duplicate</button>
+      <button onclick={() => moveBy(-1)} disabled={selected === 0} title="Move earlier" aria-label="Move earlier"><ArrowLeft /></button>
+      <button onclick={() => moveBy(1)} disabled={selected >= costumeIds.length - 1} title="Move later" aria-label="Move later"><ArrowRight /></button>
+      <button onclick={remove} disabled={costumeIds.length < 2} title="Delete costume" aria-label="Delete costume"><Trash2 /></button>
       {#if current}
         <span class="gap"></span>
         <input class="name" value={current.name} onchange={(e) => rename((e.target as HTMLInputElement).value)} aria-label="Costume name" />

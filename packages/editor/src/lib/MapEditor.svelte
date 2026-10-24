@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Eraser, Minus, Plus } from '@lucide/svelte';
   import { blankImage, blankMap, decodeLayers, decodeTiles, encodeLayers, encodeTiles, resizeImage, resizeMap, type PixelAsset } from '@stitch/cart';
   import { renderAsset } from '@stitch/cart/render';
   import PixelEditor from './PixelEditor.svelte';
@@ -274,8 +275,8 @@
       <span class="gap"></span>
       {#if tilesetAsset?.kind === 'pixel'}
         {#if tilesetAsset.height === map.tileSize}
-          <button onclick={addTile} title="Add a blank tile to the end of the tileset">＋ Tile</button>
-          <button onclick={removeTile} disabled={!lastTileFree} title="Remove the last tile (only when it's blank and unused)">− Tile</button>
+          <button onclick={addTile} title="Add a blank tile to the end of the tileset"><Plus />Tile</button>
+          <button onclick={removeTile} disabled={!lastTileFree} title="Remove the last tile (only when it's blank and unused)"><Minus />Tile</button>
         {/if}
         <button onclick={() => (editingTiles = !editingTiles)}>{editingTiles ? 'Done editing tiles' : 'Edit tileset'}</button>
       {/if}
@@ -291,7 +292,7 @@
       <div class="work">
         <aside>
           <h4>Tiles</h4>
-          <button class="eraser" class:on={tile === 0} onclick={() => (tile = 0)}>⌫ Eraser</button>
+          <button class="eraser" class:on={tile === 0} onclick={() => (tile = 0)}><Eraser />Eraser</button>
           <canvas bind:this={tilesCanvas} class="tiles" onclick={pickTile}></canvas>
           <p class="muted">Paint with the mouse. Right-click or ⌥-drag erases.</p>
         </aside>

@@ -2,7 +2,7 @@
   import type { BlockJson, Position } from '@stitch/blocks';
   import { normalizeCart, type Cart } from '@stitch/cart';
   import { format } from '@stitch/lang';
-  import { Pause, Play, Square } from '@lucide/svelte';
+  import { BookOpen, Columns2, Moon, Pause, Play, Plus, Redo2, Rows2, Square, Sun, SunMoon, Undo2, X } from '@lucide/svelte';
   import { declarations, messageNames } from '@stitch/lang/assist';
   import type { FileContext } from '@stitch/ir';
   import type { AssistData } from './lib/assist';
@@ -122,7 +122,9 @@
 
   let theme = $state<ThemePref>(themePref());
   const THEME_NEXT: Record<ThemePref, ThemePref> = { system: 'light', light: 'dark', dark: 'system' };
-  const THEME_LABEL: Record<ThemePref, string> = { system: '◐ Auto', light: '☀ Light', dark: '☾ Dark' };
+  const THEME_LABEL: Record<ThemePref, string> = { system: 'Auto', light: 'Light', dark: 'Dark' };
+  const THEME_ICON = { system: SunMoon, light: Sun, dark: Moon };
+  const ThemeIcon = $derived(THEME_ICON[theme]);
   function cycleTheme() {
     theme = THEME_NEXT[theme];
     setThemePref(theme);
@@ -630,26 +632,30 @@
     </div>
     {#if section === 'code'}
       <span class="sep"></span>
-      <button onclick={undo} disabled={!canUndo} title="Undo (⌘Z)">↶</button>
-      <button onclick={redo} disabled={!canRedo} title="Redo (⇧⌘Z)">↷</button>
+      <button onclick={undo} disabled={!canUndo} title="Undo (⌘Z)" aria-label="Undo"><Undo2 /></button>
+      <button onclick={redo} disabled={!canRedo} title="Redo (⇧⌘Z)" aria-label="Redo"><Redo2 /></button>
       <button onclick={formatCurrent} title="Format this file (⇧⌥F)">Format</button>
       <div class="seg" role="group" aria-label="View">
         <button class:on={mode === 'blocks'} aria-pressed={mode === 'blocks'} onclick={() => setMode('blocks')} title="Blocks only (⌘⌥1)">Blocks</button>
         <button class:on={mode === 'split'} aria-pressed={mode === 'split'} onclick={() => setMode('split')} title="Blocks and code (⌘⌥2)">Split</button>
         <button class:on={mode === 'text'} aria-pressed={mode === 'text'} onclick={() => setMode('text')} title="Code only (⌘⌥3)">Text</button>
       </div>
-      <button onclick={toggleOrientation} disabled={mode !== 'split'} title={layout.orientation === 'horizontal' ? 'Stack blocks above code (⌘⌥O)' : 'Put blocks and code side by side (⌘⌥O)'} aria-label="Toggle split orientation">{layout.orientation === 'horizontal' ? '⇅' : '⇆'}</button>
+      <button onclick={toggleOrientation} disabled={mode !== 'split'} title={layout.orientation === 'horizontal' ? 'Stack blocks above code (⌘⌥O)' : 'Put blocks and code side by side (⌘⌥O)'} aria-label="Toggle split orientation">{#if layout.orientation === 'horizontal'}<Rows2 />{:else}<Columns2 />{/if}</button>
     {/if}
-    <div class="spacer"></div>
+    <!-- Shrinks before anything wraps: the status text gives way first. -->
+    <div class="end">
     <span class="meta">{session.meta.title} · {renderer} · {fps} fps · {threads} thread{threads === 1 ? '' : 's'}</span>
+    <!-- The docs ship with the editor (docs.html); a new tab keeps the editor as it was. -->
+    <a class="docs-link" href="docs.html?page=docs%2Freference.md" target="_blank" rel="noopener" title="The language reference, tutorials and guides"><BookOpen />Docs</a>
     <SettingsMenu {settings} onchange={setSettings} />
-    <button class="theme" onclick={cycleTheme} title="Theme: {theme === 'system' ? 'follows your system' : theme}. Click to change." aria-label="Theme: {theme}">{THEME_LABEL[theme]}</button>
+    <button class="theme" onclick={cycleTheme} title="Theme: {theme === 'system' ? 'follows your system' : theme}. Click to change." aria-label="Theme: {THEME_LABEL[theme]}"><ThemeIcon /></button>
+    </div>
   </header>
 
   {#if notice}
     <div class="notice {notice.kind}" role={notice.kind === 'error' ? 'alert' : 'status'}>
       {notice.text}
-      <button onclick={() => (notice = undefined)} aria-label="Dismiss">×</button>
+      <button onclick={() => (notice = undefined)} aria-label="Dismiss"><X /></button>
     </div>
   {/if}
 
@@ -666,11 +672,11 @@
                     {#if problems.some((p) => p.fileId === d.id)}<span class="dot" title="has problems"></span>{/if}
                   </button>
                   {#if d.id === currentId && d.id !== STAGE_FILE}
-                    <button class="x" onclick={() => deleteSprite(d.id)} title="Delete sprite" aria-label="Delete {d.name}">×</button>
+                    <button class="x" onclick={() => deleteSprite(d.id)} title="Delete sprite" aria-label="Delete {d.name}"><X /></button>
                   {/if}
                 </span>
               {/each}
-              <button class="add" onclick={addSprite} title="Add a sprite">＋ Sprite</button>
+              <button class="add" onclick={addSprite} title="Add a sprite"><Plus />Sprite</button>
             </nav>
           {/if}
 
@@ -805,10 +811,13 @@
   .app { display: flex; flex-direction: column; height: 100vh; }
   header { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--chrome); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
   .brand { display: inline-flex; align-items: center; gap: var(--space-2); font-weight: 700; font-size: 15px; letter-spacing: 0.01em; margin-right: var(--space-3); }
-  .spacer { flex: 1; }
+  .end { flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
   .sep { width: 1px; height: 20px; background: var(--line); margin: 0 4px; }
   .meta { color: var(--muted); font-size: var(--text-s); font-variant-numeric: tabular-nums; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .theme { font-size: var(--text-s); white-space: nowrap; }
+  .docs-link { display: inline-flex; align-items: center; gap: var(--space-1); padding: var(--space-1) 10px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--panel); color: var(--text); text-decoration: none; font-size: var(--text-s); }
+  .docs-link:hover { border-color: var(--text); }
+  .docs-link :global(svg) { width: 1.15em; height: 1.15em; }
   .run { background: var(--go); border-color: var(--go); color: var(--on-go); font-weight: 600; }
   .seg { display: inline-flex; }
   .seg button { border-radius: 0; margin-left: -1px; }

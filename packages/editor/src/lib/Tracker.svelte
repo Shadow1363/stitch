@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ChevronLeft, ChevronRight, Play, Plus, Redo2, Square, Trash2, Undo2, X } from '@lucide/svelte';
   import SplitPane from './SplitPane.svelte';
   import { defaultInstrument, EFFECTS, emptyPattern, INSTRUMENT_WAVES, MAX_VOL, NOTE_OFF, noteName, ROWS_PER_BEAT, starterInstruments, type Cell, type Music, type Song } from '@stitch/cart';
   import { encodeWav, MUSIC_RATE } from '@stitch/cart/audio';
@@ -351,22 +352,22 @@
           {#each songIds as id (id)}<option value={id}>{m.songs[id]!.name}</option>{/each}
         </select>
       </label>
-      <button onclick={newSong} title="New song">＋</button>
+      <button onclick={newSong} title="New song" aria-label="New song"><Plus /></button>
       {#if song}
         <input type="text" class="name" value={song.name} aria-label="Song name" title="Scripts play it by this name" onchange={(e) => { const v = (e.target as HTMLInputElement).value.trim(); if (v) edit(() => (session.music.songs[songId!]!.name = v)); }} />
         <label>BPM <input type="number" min="20" max="400" value={song.bpm} onchange={(e) => { const v = Number((e.target as HTMLInputElement).value); if (v >= 20 && v <= 400) edit(() => (session.music.songs[songId!]!.bpm = v)); }} /></label>
         <label><input type="checkbox" checked={song.loop} onchange={(e) => edit(() => (session.music.songs[songId!]!.loop = (e.target as HTMLInputElement).checked))} /> loop in game</label>
-        <button onclick={deleteSong} title="Delete song">🗑</button>
+        <button onclick={deleteSong} title="Delete song" aria-label="Delete song"><Trash2 /></button>
       {/if}
       <span class="gap"></span>
-      <button class="go" onclick={() => playSong(false)} disabled={!song}>▶ Song</button>
-      <button onclick={() => playSong(true)} disabled={!song} title="Play the song from the selected slot and row">▶ From cursor</button>
-      <button onclick={playPattern} disabled={!pattern} title="Play this pattern from the cursor (Space)">▶ Pattern</button>
-      <button onclick={stop}>■ Stop</button>
+      <button class="go" onclick={() => playSong(false)} disabled={!song}><Play />Song</button>
+      <button onclick={() => playSong(true)} disabled={!song} title="Play the song from the selected slot and row"><Play />From cursor</button>
+      <button onclick={playPattern} disabled={!pattern} title="Play this pattern from the cursor (Space)"><Play />Pattern</button>
+      <button onclick={stop}><Square />Stop</button>
       <button onclick={exportWav} disabled={!song}>Export WAV</button>
       <span class="gap"></span>
-      <button onclick={() => step(undoStack, redoStack)} title="Undo (⌘Z)">↶</button>
-      <button onclick={() => step(redoStack, undoStack)} title="Redo (⇧⌘Z)">↷</button>
+      <button onclick={() => step(undoStack, redoStack)} title="Undo (⌘Z)" aria-label="Undo"><Undo2 /></button>
+      <button onclick={() => step(redoStack, undoStack)} title="Redo (⇧⌘Z)" aria-label="Redo"><Redo2 /></button>
     </div>
 
     {#if song}
@@ -375,10 +376,10 @@
         {#each order as pid, i (i)}
           <button class="slot" class:sel={i === orderSel} onclick={() => { orderSel = i; patSel = pid; }}>{i + 1}. {m.patterns[pid]?.name ?? '?'}</button>
         {/each}
-        <button onclick={() => patId && edit(() => { session.music.songs[songId!]!.order.push(patId); orderSel = order.length; })} disabled={!patId} title="Append the pattern being edited">＋ {pattern?.name ?? ''}</button>
-        <button onclick={() => edit(() => { const o = session.music.songs[songId!]!.order; if (orderSel > 0 && orderSel < o.length) { [o[orderSel - 1], o[orderSel]] = [o[orderSel]!, o[orderSel - 1]!]; orderSel--; } })} title="Move slot left">◀</button>
-        <button onclick={() => edit(() => { const o = session.music.songs[songId!]!.order; if (orderSel < o.length - 1) { [o[orderSel + 1], o[orderSel]] = [o[orderSel]!, o[orderSel + 1]!]; orderSel++; } })} title="Move slot right">▶</button>
-        <button onclick={() => edit(() => { session.music.songs[songId!]!.order.splice(orderSel, 1); orderSel = Math.max(0, orderSel - 1); })} disabled={!order.length} title="Remove slot">✕</button>
+        <button onclick={() => patId && edit(() => { session.music.songs[songId!]!.order.push(patId); orderSel = order.length; })} disabled={!patId} title="Append the pattern being edited"><Plus />{pattern?.name ?? ''}</button>
+        <button onclick={() => edit(() => { const o = session.music.songs[songId!]!.order; if (orderSel > 0 && orderSel < o.length) { [o[orderSel - 1], o[orderSel]] = [o[orderSel]!, o[orderSel - 1]!]; orderSel--; } })} title="Move slot left" aria-label="Move slot left"><ChevronLeft /></button>
+        <button onclick={() => edit(() => { const o = session.music.songs[songId!]!.order; if (orderSel < o.length - 1) { [o[orderSel + 1], o[orderSel]] = [o[orderSel]!, o[orderSel + 1]!]; orderSel++; } })} title="Move slot right" aria-label="Move slot right"><ChevronRight /></button>
+        <button onclick={() => edit(() => { session.music.songs[songId!]!.order.splice(orderSel, 1); orderSel = Math.max(0, orderSel - 1); })} disabled={!order.length} title="Remove slot" aria-label="Remove slot"><X /></button>
       </div>
     {/if}
 
@@ -397,7 +398,7 @@
               {#if pattern}
                 <input type="text" class="name" value={pattern.name} aria-label="Pattern name" onchange={(e) => { const v = (e.target as HTMLInputElement).value.trim(); if (v) edit(() => (session.music.patterns[patId!]!.name = v)); }} />
                 <label>Rows <input type="number" min="1" max="256" value={pattern.rows} onchange={(e) => resize(Number((e.target as HTMLInputElement).value))} /></label>
-                <button onclick={deletePattern} title="Delete pattern">🗑</button>
+                <button onclick={deletePattern} title="Delete pattern" aria-label="Delete pattern"><Trash2 /></button>
               {/if}
               <label>Octave <input type="number" min="0" max="8" bind:value={octave} /></label>
             </div>
@@ -425,7 +426,7 @@
         {/snippet}
         {#snippet b()}
           <aside class="insts">
-            <div class="bar"><b>Instruments</b><button onclick={newInstrument}>＋</button></div>
+            <div class="bar"><b>Instruments</b><button onclick={newInstrument} title="New instrument" aria-label="New instrument"><Plus /></button></div>
             <ul>
               {#each instIds as id, i (id)}
                 <li><button class:sel={id === instId} onclick={() => (instSel = id)}>{String(i + 1).padStart(2, '0')} {m.instruments[id]!.name}</button></li>
@@ -454,8 +455,8 @@
                   </label>
                 {/each}
                 <div class="bar">
-                  <button onclick={() => previewNote((octave + 1) * 12)}>▶ C-{octave}</button>
-                  <button onclick={deleteInstrument} title="Delete instrument">🗑</button>
+                  <button onclick={() => previewNote((octave + 1) * 12)}><Play />C-{octave}</button>
+                  <button onclick={deleteInstrument} title="Delete instrument" aria-label="Delete instrument"><Trash2 /></button>
                 </div>
               </div>
             {/if}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ArrowDown, ArrowUp, Crosshair, Eraser, Eye, EyeOff, Minus, PaintBucket, Pencil, Pipette, Plus, RectangleHorizontal, Redo2, Slash, Trash2, Undo2 } from '@lucide/svelte';
   import SplitPane from './SplitPane.svelte';
   import {
     cloneImage,
@@ -32,14 +33,14 @@
   let { asset, palette, onionAsset, onchange }: Props = $props();
 
   type Tool = 'pencil' | 'eraser' | 'fill' | 'line' | 'rect' | 'picker' | 'center';
-  const TOOLS: { id: Tool; label: string; key: string }[] = [
-    { id: 'pencil', label: '✏️ Pencil', key: 'p' },
-    { id: 'eraser', label: '⌫ Eraser', key: 'e' },
-    { id: 'fill', label: '🪣 Fill', key: 'f' },
-    { id: 'line', label: '╱ Line', key: 'l' },
-    { id: 'rect', label: '▭ Rect', key: 'r' },
-    { id: 'picker', label: '💧 Pick', key: 'i' },
-    { id: 'center', label: '✛ Center', key: 'c' },
+  const TOOLS: { id: Tool; label: string; key: string; icon: typeof Pencil }[] = [
+    { id: 'pencil', label: 'Pencil', key: 'p', icon: Pencil },
+    { id: 'eraser', label: 'Eraser', key: 'e', icon: Eraser },
+    { id: 'fill', label: 'Fill', key: 'f', icon: PaintBucket },
+    { id: 'line', label: 'Line', key: 'l', icon: Slash },
+    { id: 'rect', label: 'Rect', key: 'r', icon: RectangleHorizontal },
+    { id: 'picker', label: 'Pick', key: 'i', icon: Pipette },
+    { id: 'center', label: 'Center', key: 'c', icon: Crosshair },
   ];
 
   // Initial values only; the effect below reloads when `asset` changes.
@@ -325,15 +326,15 @@
 <div class="art-editor pixel" tabindex="-1" onkeydown={onKey} role="application" aria-label="Pixel editor">
   <div class="tools" role="toolbar">
     {#each TOOLS as t (t.id)}
-      <button class:on={tool === t.id} title="{t.label} ({t.key.toUpperCase()})" onclick={() => (tool = t.id)}>{t.label}</button>
+      <button class:on={tool === t.id} title="{t.label} ({t.key.toUpperCase()})" onclick={() => (tool = t.id)}><t.icon />{t.label}</button>
     {/each}
     <span class="gap"></span>
-    <button onclick={undo} title="Undo (⌘Z)">↶</button>
-    <button onclick={redo} title="Redo (⇧⌘Z)">↷</button>
+    <button onclick={undo} title="Undo (⌘Z)" aria-label="Undo"><Undo2 /></button>
+    <button onclick={redo} title="Redo (⇧⌘Z)" aria-label="Redo"><Redo2 /></button>
     <span class="gap"></span>
-    <button onclick={() => (zoom = Math.max(1, zoom - 2))} title="Zoom out">−</button>
+    <button onclick={() => (zoom = Math.max(1, zoom - 2))} title="Zoom out" aria-label="Zoom out"><Minus /></button>
     <span class="zoom">{zoom}×</span>
-    <button onclick={() => (zoom = Math.min(48, zoom + 2))} title="Zoom in">+</button>
+    <button onclick={() => (zoom = Math.min(48, zoom + 2))} title="Zoom in" aria-label="Zoom in"><Plus /></button>
     <label><input type="checkbox" bind:checked={grid} /> grid</label>
     <label title="Show the previous frame underneath"><input type="checkbox" bind:checked={onion} /> onion skin</label>
   </div>
@@ -376,16 +377,16 @@
           <ul class="layers">
             {#each img.layers.map((l, i) => ({ l, i })).reverse() as { l, i } (i)}
               <li class:sel={i === layer}>
-                <button class="eye" title={l.visible ? 'Hide' : 'Show'} onclick={() => toggleLayer(i)}>{l.visible ? '👁' : '–'}</button>
+                <button class="eye" title={l.visible ? 'Hide' : 'Show'} onclick={() => toggleLayer(i)} aria-label={l.visible ? 'Hide layer' : 'Show layer'}>{#if l.visible}<Eye />{:else}<EyeOff />{/if}</button>
                 <button class="name" onclick={() => (layer = i)} ondblclick={() => renameLayer(i)}>{l.name}</button>
               </li>
             {/each}
           </ul>
           <div class="layer-actions">
-            <button onclick={addLayer} title="New layer">＋</button>
-            <button onclick={deleteLayer} disabled={img.layers.length === 1} title="Delete layer">🗑</button>
-            <button onclick={() => moveLayer(1)} disabled={layer === img.layers.length - 1} title="Move up">↑</button>
-            <button onclick={() => moveLayer(-1)} disabled={layer === 0} title="Move down">↓</button>
+            <button onclick={addLayer} title="New layer" aria-label="New layer"><Plus /></button>
+            <button onclick={deleteLayer} disabled={img.layers.length === 1} title="Delete layer" aria-label="Delete layer"><Trash2 /></button>
+            <button onclick={() => moveLayer(1)} disabled={layer === img.layers.length - 1} title="Move up" aria-label="Move layer up"><ArrowUp /></button>
+            <button onclick={() => moveLayer(-1)} disabled={layer === 0} title="Move down" aria-label="Move layer down"><ArrowDown /></button>
           </div>
         </aside>
       {/snippet}

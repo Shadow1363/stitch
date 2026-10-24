@@ -58,4 +58,15 @@ describe('fixed-timestep loop', () => {
     expect(errors).toEqual([new Error('boom')]);
     expect(l.running).toBe(true);
   });
+
+  it('renders but runs no ticks while paused, and resumes without catching up', () => {
+    const { l, counts } = loop();
+    let t = 0;
+    l.frame((t += TICK_MS));
+    l.paused = true;
+    for (let i = 0; i < 60; i++) expect(l.frame((t += TICK_MS))).toBe(0);
+    l.paused = false;
+    expect(l.frame((t += TICK_MS))).toBe(1);
+    expect(counts).toEqual({ ticks: 2, renders: 62 });
+  });
 });
