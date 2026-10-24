@@ -3,6 +3,7 @@ import {
   PROTOCOL_VERSION,
   transferablesOf,
   type FromStage,
+  type HttpResponse,
   type LoadPayload,
   type ToStage,
 } from './protocol';
@@ -50,6 +51,8 @@ export class StageClient {
     const f = document.createElement('iframe');
     // allow-scripts only: opaque origin, no access to editor storage, cookies or secrets.
     f.setAttribute('sandbox', 'allow-scripts');
+    // Lets the stage start audio on the editor's Run click; it grants nothing else.
+    f.setAttribute('allow', 'autoplay');
     f.src = this.opts.src;
     f.title = 'Stage';
     f.style.cssText = 'border:0;width:100%;height:100%;display:block';
@@ -95,6 +98,16 @@ export class StageClient {
 
   stop() {
     this.post({ t: 'stop' });
+  }
+
+  pause(paused: boolean) {
+    this.post({ t: 'pause', paused });
+    if (!paused) this.iframe.focus();
+  }
+
+  /** Answers the stage's `http` request `id`. */
+  httpResult(id: number, res: HttpResponse) {
+    this.post({ t: 'http-result', id, ...res });
   }
 
   focus() {

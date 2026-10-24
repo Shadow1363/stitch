@@ -37,4 +37,25 @@ describe('fixed-timestep loop', () => {
     expect(l.frame(1000)).toBe(MAX_TICKS_PER_FRAME);
     expect(l.frame(1000 + TICK_MS)).toBe(1);
   });
+
+  it('keeps running after a frame throws, and reports it', () => {
+    const frames: ((t: number) => void)[] = [];
+    const errors: unknown[] = [];
+    let renders = 0;
+    const l = createLoop({
+      tick: () => {},
+      render: () => {
+        if (++renders === 1) throw new Error('boom');
+      },
+      onError: (e) => errors.push(e),
+      requestFrame: (cb) => frames.push(cb),
+      cancelFrame: () => {},
+    });
+    l.start();
+    frames.shift()!(0);
+    frames.shift()!(TICK_MS);
+    expect(renders).toBe(2);
+    expect(errors).toEqual([new Error('boom')]);
+    expect(l.running).toBe(true);
+  });
 });

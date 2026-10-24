@@ -1,0 +1,172 @@
+-- The player: reads the keys, moves one cell per turn, and works out what you can see.
+-- Arrow keys or WASD. Walk into an enemy to attack it.
+-- How many ticks a movement key has been held down, for key repeat.
+var hold = 0
+-- Cells in sight last turn, as dictionaries with x and y.
+var lit = []
+
+on start do
+  hide()
+  rotation_style("left-right")
+  forever do
+    if state == "play" then
+      if key_down("left") or key_down("right") or key_down("up") or key_down("down") or key_down("a") or key_down("d") or key_down("w") or key_down("s") then
+        hold += 1
+      else
+        hold = 0
+      end
+      if wants("left", "a") then
+        take_turn(-1, 0)
+      elseif wants("right", "d") then
+        take_turn(1, 0)
+      elseif wants("up", "w") then
+        take_turn(0, -1)
+      elseif wants("down", "s") then
+        take_turn(0, 1)
+      end
+    elseif state == "dead" and key_pressed("r") then
+      broadcast_wait("restart")
+    end
+  end
+end
+
+-- True when key k1 or k2 was just pressed, or has been held long enough to repeat.
+function wants(k1, k2)
+  if key_pressed(k1) or key_pressed(k2) then
+    return true
+  end
+  return (key_down(k1) or key_down(k2)) and hold > 15 and hold % 5 == 0
+end
+
+-- One turn: attack, or step (picking up a potion or taking the stairs), then the enemies move.
+function take_turn(dx, dy)
+  if dx ~= 0 then
+    point(90 * dx)
+  end
+  local nx = px + dx
+  local ny = py + dy
+  if cell(level, nx, ny) == 1 then
+    return
+  end
+  local foe = cell(occ, nx, ny)
+  if foe ~= "" then
+    -- A bump attack: tell that enemy it has been hit.
+    target = foe
+    damage = random_int(1, 3)
+    play_sound("hit")
+    broadcast_wait("hit")
+  else
+    px = nx
+    py = ny
+    place()
+    next_costume()
+    play_sound("step")
+    if cell(loot, px, py) ~= "" then
+      target = cell(loot, px, py)
+      broadcast_wait("pickup")
+    end
+    if cell(level, px, py) == 3 then
+      broadcast_wait("descend")
+      return
+    end
+  end
+  turn += 1
+  -- Resting heals: one hit point every 10 turns.
+  if turn % 10 == 0 and health < max_health then
+    health += 1
+  end
+  reveal()
+  broadcast_wait("enemy turn")
+  broadcast_wait("look")
+  broadcast_wait("hud")
+  if health <= 0 then
+    broadcast_wait("game over")
+  end
+end
+
+-- Moves the sprite to the middle of its cell.
+function place()
+  goto(px * 8 - 4, py * 8 - 4)
+end
+
+-- A new floor: start in the first room and look around.
+on message "arrive" do
+  px = start_x
+  py = start_y
+  lit = []
+  place()
+  go_to_front()
+  show()
+  reveal()
+end
+
+on message "game over" do
+  hide()
+end
+
+-- An enemy hit us: blink for a moment.
+on message "ouch" do
+  set_effect("ghost", 70)
+  wait(0.15)
+  clear_effects()
+end
+
+-- ---- What can we see? ----
+-- Lights every cell within 6 that a straight line from the player reaches.
+-- Cells that were lit last turn and aren't now are dimmed: remembered, not seen.
+warp function reveal()
+  for c in lit do
+    set_map_cell(c["x"], c["y"], cell(level, c["x"], c["y"]) + 3)
+    set_cell(visible, c["x"], c["y"], 0)
+  end
+  lit = []
+  for row = py - 6, py + 6 do
+    for col = px - 6, px + 6 do
+      if col >= 1 and row >= 1 and col <= map_w and row <= map_h and distance(col, row, px, py) <= 6.5 then
+        if can_see(px, py, col, row) then
+          set_map_cell(col, row, cell(level, col, row))
+          set_cell(seen, col, row, 1)
+          set_cell(visible, col, row, 1)
+          push(lit, at(col, row))
+        end
+      end
+    end
+  end
+end
+
+-- Can you see from (x0, y0) to (x1, y1)? Steps along a straight line of cells (Bresenham's
+-- line algorithm) and fails at the first wall before the end. You can see a wall, not past it.
+function can_see(x0, y0, x1, y1)
+  local dx = abs(x1 - x0)
+  local dy = -abs(y1 - y0)
+  local sx = sign(x1 - x0)
+  local sy = sign(y1 - y0)
+  local err = dx + dy
+  local col = x0
+  local row = y0
+  forever do
+    if col == x1 and row == y1 then
+      return true
+    end
+    if cell(level, col, row) == 1 then
+      return false
+    end
+    local e2 = 2 * err
+    if e2 >= dy then
+      err += dy
+      col += sx
+    end
+    if e2 <= dx then
+      err += dx
+      row += sy
+    end
+  end
+end
+
+-- A cell position as a dictionary.
+function at(col, row)
+  local p = dict()
+  p["x"] = col
+  p["y"] = row
+  return p
+end

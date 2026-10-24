@@ -1,0 +1,186 @@
+-- Patch, the player. Arrow keys or A and D to run; Z, Space or Up to jump.
+-- Hold jump for a high jump and let go early for a short hop.
+-- Speed in pixels per tick, across and down.
+var vx = 0
+var vy = 0
+-- Movement left over from the last tick, so slow speeds still add up to whole pixels.
+var rx = 0
+var ry = 0
+-- Ticks since Patch last stood on something: a jump still works for a moment after running off
+-- a ledge ("coyote time"), which makes jumps feel fair.
+var air = 0
+
+on start do
+  hide()
+  rotation_style("left-right")
+end
+
+on message "spawn" do
+  goto(start_x, start_y)
+  vx = 0
+  vy = 0
+  rx = 0
+  ry = 0
+  point(90)
+  costume("stand")
+  show()
+end
+
+on message "clear" do
+  hide()
+end
+
+on start do
+  forever do
+    if state == "play" then
+      run()
+      jump()
+      move_x(vx)
+      move_y(vy)
+      animate()
+      check_tiles()
+    end
+  end
+end
+
+-- Speeds up toward the arrow held, and slows down when none is.
+function run()
+  local want = 0
+  if key_down("left") or key_down("a") then
+    want -= 1
+  end
+  if key_down("right") or key_down("d") then
+    want += 1
+  end
+  if want == 0 then
+    vx = vx * 0.7
+    if abs(vx) < 0.05 then
+      vx = 0
+    end
+  else
+    vx = clamp(vx + want * 0.25, -1.6, 1.6)
+    point(90 * want)
+  end
+end
+
+function jump()
+  if blocked(x, y + 1) then
+    air = 0
+  else
+    air += 1
+  end
+  if jump_pressed() and air < 6 then
+    vy = -4.4
+    air = 6
+    play_sound("jump")
+  end
+  -- Letting go of jump while still rising cuts the jump short.
+  if vy < -1.5 and not jump_held() then
+    vy = -1.5
+  end
+  vy = min(vy + 0.3, 5)
+end
+
+function jump_pressed()
+  return key_pressed("z") or key_pressed("space") or key_pressed("up") or key_pressed("w")
+end
+
+function jump_held()
+  return key_down("z") or key_down("space") or key_down("up") or key_down("w")
+end
+
+-- Moves one pixel at a time, stopping at the first solid tile.
+warp function move_x(amount)
+  rx += amount
+  local n = round(rx)
+  rx -= n
+  repeat abs(n) do
+    if blocked(x + sign(n), y) then
+      vx = 0
+      rx = 0
+      return
+    end
+    x += sign(n)
+  end
+end
+
+warp function move_y(amount)
+  ry += amount
+  local n = round(ry)
+  ry -= n
+  repeat abs(n) do
+    if blocked(x, y + sign(n)) then
+      vy = 0
+      ry = 0
+      return
+    end
+    y += sign(n)
+  end
+end
+
+-- True when Patch's box (6 by 8 pixels) at (px, py) would overlap a solid tile.
+function blocked(px, py)
+  return solid(px - 3, py - 4) or solid(px + 2, py - 4) or solid(px - 3, py + 3) or solid(px + 2, py + 3)
+end
+
+-- Ground, earth and ledges (tiles 1 to 3) are solid; the edges of the stage are walls.
+function solid(px, py)
+  if px < 0 or px >= stage_width() then
+    return true
+  end
+  local t = tile(px, py)
+  return t >= 1 and t <= 3
+end
+
+function goal(px, py)
+  return tile(px, py) == 5 or tile(px, py) == 6
+end
+
+-- The tile number at a point, 0 for none.
+function tile(px, py)
+  return map_cell(floor(px / 8) + 1, floor(py / 8) + 1)
+end
+
+function animate()
+  if air > 1 then
+    costume("jump")
+  elseif vx == 0 then
+    costume("stand")
+  elseif frame_count() % 8 == 0 then
+    if costume_name() == "run" then
+      costume("stand")
+    else
+      costume("run")
+    end
+  end
+end
+
+-- Spikes and falling off the bottom cost a life; touching the flag or its pole ends the level.
+function check_tiles()
+  if y > stage_height() + 8 or tile(x, y) == 4 or tile(x, y + 3) == 4 then
+    lose_life()
+  elseif goal(x - 3, y - 4) or goal(x + 2, y - 4) or goal(x - 3, y + 3) or goal(x + 2, y + 3) then
+    -- Busy at once, so nothing else happens before the Stage takes over.
+    state = "busy"
+    broadcast("level done")
+  end
+end
+
+function lose_life()
+  state = "busy"
+  play_sound("hurt")
+  hide()
+  broadcast("died")
+end
+
+-- A Snip touched Patch from the side.
+on message "hurt" do
+  if state == "play" then
+    lose_life()
+  end
+end
+
+-- Patch landed on a Snip: bounce off it.
+on message "stomp" do
+  vy = -3.5
+end

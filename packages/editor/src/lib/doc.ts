@@ -1,14 +1,18 @@
 import { fromBlocks, type BlockJson, type Position } from '@stitch/blocks';
 import {
   carryTextDetails,
+  CORE_CATALOG,
   createIdGen,
   irEqual,
   reconcile,
+  type Catalog,
   type IdGen,
   type Module,
   type NodeId,
 } from '@stitch/ir';
 import { parse, printModule, type Span, type SyntaxDiagnostic } from '@stitch/lang';
+
+const SESSION_TAG = Math.random().toString(36).slice(2, 8);
 
 /** What undo/redo restores for one file. */
 export interface Snapshot {
@@ -35,12 +39,28 @@ export class SourceDoc {
 
   constructor(
     readonly id: string,
-    readonly name: string,
+    public name: string,
     text: string,
   ) {
-    this.ids = createIdGen(`${id}:`);
+    // A per-session tag keeps new ids from colliding with ids saved by earlier sessions.
+    this.ids = createIdGen(`${id}:${SESSION_TAG}.`);
     this.text = text;
     this.reparse(text);
+  }
+
+  /** A doc for saved IR: keeps the saved node ids, so saved block positions still apply. */
+  static fromModule(
+    id: string,
+    name: string,
+    module: Module,
+    state?: { layout?: Record<string, Position>; loose?: BlockJson[] },
+  ): SourceDoc {
+    const doc = new SourceDoc(id, name, '');
+    doc.module = module;
+    doc.setText(printModule(module));
+    if (state?.layout) doc.layout = { ...state.layout };
+    if (state?.loose) doc.loose = structuredClone(state.loose);
+    return doc;
   }
 
   /** The text view changed. Returns true if the program (or its comments) changed. */
@@ -53,8 +73,8 @@ export class SourceDoc {
    * The blocks view changed. Returns true when re-parsing the printed text changed the program
    * (e.g. a raw-code block now holds valid code), so the blocks view should redraw.
    */
-  setBlocks(blocks: BlockJson[]): boolean {
-    const r = fromBlocks(blocks);
+  setBlocks(blocks: BlockJson[], catalog: Catalog = CORE_CATALOG): boolean {
+    const r = fromBlocks(blocks, catalog);
     const next = carryTextDetails(this.module, orderLike(this.module, r.module));
     this.layout = r.layout;
     this.loose = r.loose;
@@ -119,6 +139,9 @@ export function orderLike(old: Module, next: Module): Module {
   return out;
 }
 
+/** Where an edit came from. Only text edits merge; a format is always its own undo step. */
+export type EditKind = 'text' | 'blocks' | 'format';
+
 export interface HistoryEntry {
   docId: string;
   snapshot: Snapshot;
@@ -129,7 +152,7 @@ export interface HistoryEntry {
  * A run of text edits within `mergeMs` of each other is one entry, like typing a word.
  */
 export class History {
-  private past: (HistoryEntry & { kind: 'text' | 'blocks'; at: number })[] = [];
+  private past: (HistoryEntry & { kind: EditKind; at: number })[] = [];
   private future: HistoryEntry[] = [];
 
   constructor(
@@ -137,7 +160,7 @@ export class History {
     private mergeMs = 1000,
   ) {}
 
-  record(docId: string, before: Snapshot, kind: 'text' | 'blocks', now = Date.now()): void {
+  record(docId: string, before: Snapshot, kind: EditKind, now = Date.now()): void {
     const last = this.past[this.past.length - 1];
     this.future = [];
     if (

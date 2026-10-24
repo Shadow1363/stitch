@@ -62,7 +62,7 @@ function topItem(lines: string[], it: TopItem) {
     case 'VarDecl':
       lines.push(
         withLineComment(
-          `${it.scope === 'global' ? 'global ' : ''}var ${it.name} = ${expr(it.init)}`,
+          `${it.scope === 'sprite' ? '' : it.scope + ' '}var ${it.name} = ${expr(it.init)}`,
           it.trivia,
         ),
       );
@@ -91,6 +91,9 @@ function event(e: EventSpec): string {
       return `key ${escapeString(e.key)}`;
     case 'message':
       return `message ${escapeString(e.name)}`;
+    case 'clone':
+    case 'click':
+      return e.type;
   }
 }
 
@@ -137,6 +140,12 @@ function stmt(lines: string[], s: Stmt, ind: string) {
       lines.push(
         withLineComment(s.value ? `${ind}return ${expr(s.value)}` : `${ind}return`, s.trivia),
       );
+      return;
+    case 'Break':
+      lines.push(withLineComment(`${ind}break`, s.trivia));
+      return;
+    case 'Continue':
+      lines.push(withLineComment(`${ind}continue`, s.trivia));
       return;
     case 'Raw':
       raw(lines, s.text, ind, s.trivia);

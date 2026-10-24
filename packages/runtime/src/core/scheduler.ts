@@ -1,12 +1,12 @@
 import type { Sprite } from './sprite';
 
 export type ThreadGen = Generator<unknown, unknown, unknown>;
-export type EventType = 'start' | 'key' | 'message';
+export type EventType = 'start' | 'key' | 'message' | 'clone' | 'click';
 
 export interface Script {
   sprite: Sprite;
   event: EventType;
-  /** Key name or message name; null for start. */
+  /** Key name or message name; null for the other events. */
   arg: string | null;
   body: () => ThreadGen;
 }
@@ -32,7 +32,10 @@ export interface ThreadError {
  * order never depends on where the triggering thread sits in the list.
  */
 export class Scheduler {
-  readonly scripts: Script[] = [];
+  /** Scripts by event and argument, in registration order. */
+  private byEvent = new Map<string, Script[]>();
+  /** Each script's most recent thread, so triggers don't search every thread. */
+  private latest = new Map<Script, Thread>();
   threads: Thread[] = [];
   /** The thread being stepped, if any. */
   current: Thread | null = null;
@@ -40,19 +43,44 @@ export class Scheduler {
   constructor(private onError: (e: ThreadError) => void = () => {}) {}
 
   add(script: Script): void {
-    this.scripts.push(script);
+    const k = key(script.event, script.arg);
+    const list = this.byEvent.get(k);
+    if (list) list.push(script);
+    else this.byEvent.set(k, [script]);
+  }
+
+  /** Every script, in registration order within each event. */
+  get scripts(): Script[] {
+    return [...this.byEvent.values()].flat();
+  }
+
+  /** Drops a deleted clone's scripts and ends its threads. */
+  removeSprite(sprite: Sprite): void {
+    for (const [k, list] of this.byEvent) {
+      const keep = list.filter((s) => s.sprite !== sprite);
+      if (keep.length === list.length) continue;
+      this.byEvent.set(k, keep);
+      for (const s of list) if (s.sprite === sprite) this.latest.delete(s);
+    }
+    for (const t of this.threads) if (t.script.sprite === sprite) t.state = 'done';
+  }
+
+  /** Ends every thread of `sprite` except `keep` (Scratch "stop other scripts in sprite"). */
+  stopOthers(sprite: Sprite, keep: Thread | null): void {
+    for (const t of this.threads) if (t.script.sprite === sprite && t !== keep) t.state = 'done';
   }
 
   /**
-   * Starts every script listening for (event, arg), in registration order.
-   * restart: a script that is already running starts over in place (broadcast semantics);
-   * otherwise it is left alone (key semantics).
+   * Starts every script listening for (event, arg), in registration order; only `sprite`'s
+   * when given. restart: a script that is already running starts over in place (broadcast
+   * semantics); otherwise it is left alone (key semantics).
    */
-  trigger(event: EventType, arg: string | null, restart: boolean): Thread[] {
+  trigger(event: EventType, arg: string | null, restart: boolean, sprite?: Sprite): Thread[] {
     const started: Thread[] = [];
-    for (const script of this.scripts) {
-      if (script.event !== event || script.arg !== arg) continue;
-      const existing = this.threads.find((t) => t.script === script && t.state !== 'done');
+    for (const script of this.byEvent.get(key(event, arg)) ?? []) {
+      if (sprite && script.sprite !== sprite) continue;
+      const last = this.latest.get(script);
+      const existing = last && last.state !== 'done' ? last : undefined;
       if (existing) {
         if (!restart) continue;
         existing.gen = script.body();
@@ -62,6 +90,7 @@ export class Scheduler {
       }
       const t: Thread = { script, gen: script.body(), state: 'pending' };
       this.threads.push(t);
+      this.latest.set(script, t);
       started.push(t);
     }
     return started;
@@ -98,3 +127,5 @@ export class Scheduler {
     return this.threads.length;
   }
 }
+
+const key = (event: EventType, arg: string | null) => (arg === null ? event : `${event}:${arg}`);

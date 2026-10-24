@@ -15,6 +15,6 @@ export function migrateProject(data: unknown): Project {
   if (typeof v !== 'number') throw new Error('project: missing irVersion');
   if (v > IR_VERSION)
     throw new Error(`project: irVersion ${v} is newer than this build supports (${IR_VERSION})`);
-  // No older versions exist yet; add stepwise migrations here when IR_VERSION is bumped.
-  return data as Project;
+  // 1 -> 2 only added shapes (Break, Continue, clone and click events, shared vars): no rewrite.
+  return { ...(data as Project), irVersion: IR_VERSION };
 }

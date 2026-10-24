@@ -1,0 +1,292 @@
+-- Stitch Dungeon: a tiny roguelike. Find the stairs, survive as many floors as you can.
+-- The Stage builds each floor, keeps the game's state and draws the HUD under the map.
+-- The Player, Enemy and Potion sprites take turns by sending each other messages.
+-- Set a number to get the same dungeon every run (0 makes a new one each time).
+global var seed = 0
+
+-- The map is 32 x 20 cells of 8 pixels. Tile numbers in the tileset:
+-- 1 wall, 2 floor, 3 stairs, and 4 to 6 the same three, dimmed (seen before, not in sight).
+global var map_w = 32
+global var map_h = 20
+
+-- The floor as grids (lists of rows), read with cell(grid, x, y):
+-- level is the real layout, seen marks cells you have seen, visible the ones in sight now,
+-- occ the enemy standing on each cell and loot the potion lying there ("" for none).
+global var level = []
+global var seen = []
+global var visible = []
+global var occ = []
+global var loot = []
+
+-- Rooms (dictionaries with x, y, w and h), and where things start on this floor.
+global var rooms = []
+global var enemy_spots = []
+global var potion_spots = []
+global var start_x = 0
+global var start_y = 0
+
+-- The player's cell and health, the floor number and the turn count.
+global var px = 0
+global var py = 0
+global var health = 10
+global var max_health = 10
+global var depth = 1
+global var turn = 0
+-- "busy" while a floor is being built, "play" while you can move, "dead" after game over.
+global var state = "busy"
+-- The seed this run actually uses, shown on the game over screen.
+global var seed_used = 0
+-- The latest messages; the HUD shows the last three.
+global var messages = []
+
+-- Who the player just hit or picked up, and how hard (for the "hit" and "pickup" messages).
+global var target = ""
+global var damage = 0
+
+on start do
+  new_game()
+end
+
+on message "restart" do
+  new_game()
+end
+
+-- Starts a run from floor 1.
+function new_game()
+  if seed == 0 then
+    seed_used = random_int(1, 99999)
+  else
+    seed_used = seed
+  end
+  set_seed(seed_used)
+  health = max_health
+  depth = 1
+  turn = 0
+  messages = ["WELCOME TO STITCH DUNGEON", "FIND THE STAIRS DOWN"]
+  play_music("dungeon")
+  build_floor()
+end
+
+-- Going down the stairs.
+on message "descend" do
+  depth += 1
+  push(messages, "YOU GO DOWN TO FLOOR " .. depth)
+  play_sound("stairs")
+  build_floor()
+end
+
+-- Clears the old floor, makes a new one and puts everyone in place.
+function build_floor()
+  state = "busy"
+  broadcast_wait("clear")
+  generate()
+  broadcast_wait("spawn")
+  broadcast_wait("arrive")
+  broadcast_wait("look")
+  broadcast_wait("hud")
+  state = "play"
+end
+
+-- ---- Making a floor ----
+-- Carves rooms out of solid wall and joins each one to the previous room with a corridor.
+-- Every room is reachable from the first, so the stairs always are too.
+warp function generate()
+  level = make_grid(map_w, map_h, 1)
+  seen = make_grid(map_w, map_h, 0)
+  visible = make_grid(map_w, map_h, 0)
+  occ = make_grid(map_w, map_h, "")
+  loot = make_grid(map_w, map_h, "")
+  rooms = []
+  local tries = 0
+  repeat until len(rooms) >= 9 or tries >= 300 do
+    tries += 1
+    local r = dict()
+    r["w"] = random_int(4, 8)
+    r["h"] = random_int(3, 5)
+    r["x"] = random_int(2, map_w - r["w"])
+    r["y"] = random_int(2, map_h - r["h"])
+    if fits(r) then
+      carve(r)
+      if len(rooms) > 0 then
+        corridor(rooms[len(rooms)], r)
+      end
+      push(rooms, r)
+    end
+  end
+  -- Start in the first room, stairs in the last.
+  start_x = mid_x(rooms[1])
+  start_y = mid_y(rooms[1])
+  set_cell(level, mid_x(rooms[len(rooms)]), mid_y(rooms[len(rooms)]), 3)
+  place_things()
+  -- Nothing is seen yet: the map starts black.
+  for row = 1, map_h do
+    for col = 1, map_w do
+      set_map_cell(col, row, 0)
+    end
+  end
+end
+
+-- True when room r keeps at least one wall between itself and every room so far.
+function fits(r)
+  for o in rooms do
+    if r["x"] <= o["x"] + o["w"] and o["x"] <= r["x"] + r["w"] and r["y"] <= o["y"] + o["h"] and o["y"] <= r["y"] + r["h"] then
+      return false
+    end
+  end
+  return true
+end
+
+function carve(r)
+  for row = r["y"], r["y"] + r["h"] - 1 do
+    for col = r["x"], r["x"] + r["w"] - 1 do
+      set_cell(level, col, row, 2)
+    end
+  end
+end
+
+-- An L-shaped corridor between the middles of two rooms.
+function corridor(a, b)
+  local col = mid_x(a)
+  local row = mid_y(a)
+  repeat until col == mid_x(b) do
+    col += sign(mid_x(b) - col)
+    dig(col, row)
+  end
+  repeat until row == mid_y(b) do
+    row += sign(mid_y(b) - row)
+    dig(col, row)
+  end
+end
+
+-- Turns wall into floor, leaving rooms and stairs as they are.
+function dig(col, row)
+  if cell(level, col, row) == 1 then
+    set_cell(level, col, row, 2)
+  end
+end
+
+function mid_x(r)
+  return r["x"] + floor(r["w"] / 2)
+end
+
+function mid_y(r)
+  return r["y"] + floor(r["h"] / 2)
+end
+
+-- Picks cells for enemies and potions in every room but the first.
+-- Deeper floors have more enemies, and tougher ones.
+function place_things()
+  enemy_spots = []
+  potion_spots = []
+  local taken = make_grid(map_w, map_h, false)
+  for i = 2, len(rooms) do
+    local r = rooms[i]
+    repeat random_int(0, 1 + floor(depth / 2)) do
+      local spot = free_cell(r, taken)
+      local roll = random_int(1, 10) + depth
+      if roll >= 11 then
+        spot["kind"] = 3
+      elseif roll >= 7 then
+        spot["kind"] = 2
+      else
+        spot["kind"] = 1
+      end
+      push(enemy_spots, spot)
+    end
+    if random_int(1, 3) == 1 then
+      push(potion_spots, free_cell(r, taken))
+    end
+  end
+end
+
+-- A random empty floor cell of room r, as a dictionary with x and y. Marks it taken.
+function free_cell(r, taken)
+  local spot = dict()
+  repeat until cell(level, spot["x"], spot["y"]) == 2 and not cell(taken, spot["x"], spot["y"]) do
+    spot["x"] = random_int(r["x"], r["x"] + r["w"] - 1)
+    spot["y"] = random_int(r["y"], r["y"] + r["h"] - 1)
+  end
+  set_cell(taken, spot["x"], spot["y"], true)
+  return spot
+end
+
+-- ---- The HUD, drawn with the pen under the map ----
+on message "hud" do
+  draw_hud()
+end
+
+warp function draw_hud()
+  clear_pen()
+  set_pen_size(1)
+  -- Health bar: dark when empty, red for what is left.
+  set_pen_color(3)
+  fill_rect(4, 164, 64, 170)
+  set_pen_color(9)
+  fill_rect(4, 164, 4 + 60 * max(0, health) / max_health, 170)
+  set_pen_color(8)
+  draw_text("HP " .. max(0, health) .. "/" .. max_health, 68, 165)
+  draw_text("FLOOR " .. depth, 4, 174)
+  draw_text("FOES " .. var_of("Enemy", "alive"), 68, 174)
+  -- The message log: the last three lines.
+  repeat until len(messages) <= 3 do
+    remove(messages, 1)
+  end
+  set_pen_color(7)
+  for i = 1, len(messages) do
+    draw_text(messages[i], 4, 182 + i * 7)
+  end
+  draw_minimap()
+end
+
+-- Two pixels per cell, bottom right: what you've seen, enemies in sight, the stairs and you.
+function draw_minimap()
+  local ox = 188
+  local oy = 164
+  for row = 1, map_h do
+    for col = 1, map_w do
+      if cell(seen, col, row) == 1 then
+        local t = cell(level, col, row)
+        if t == 1 then
+          set_pen_color(6)
+        elseif t == 3 then
+          set_pen_color(10)
+        else
+          set_pen_color(2)
+        end
+        fill_rect(ox + col * 2 - 2, oy + row * 2 - 2, ox + col * 2, oy + row * 2)
+      end
+    end
+  end
+  set_pen_color(9)
+  for e in clones("Enemy") do
+    local ex = var_of(e, "cx")
+    local ey = var_of(e, "cy")
+    if cell(visible, ex, ey) == 1 then
+      fill_rect(ox + ex * 2 - 2, oy + ey * 2 - 2, ox + ex * 2, oy + ey * 2)
+    end
+  end
+  set_pen_color(12)
+  fill_rect(ox + px * 2 - 2, oy + py * 2 - 2, ox + px * 2, oy + py * 2)
+end
+
+-- ---- Game over ----
+on message "game over" do
+  state = "dead"
+  stop_music()
+  play_sound("death")
+  set_pen_color(1)
+  fill_rect(40, 50, 216, 118)
+  set_pen_color(9)
+  centered("GAME OVER", 58, 3)
+  set_pen_color(8)
+  centered("YOU REACHED FLOOR " .. depth .. " IN " .. turn .. " TURNS", 84, 1)
+  centered("SEED " .. seed_used, 94, 1)
+  set_pen_color(11)
+  centered("PRESS R TO PLAY AGAIN", 106, 1)
+end
+
+-- Writes text centred across the stage. The pixel font is 4 pixels a letter.
+function centered(text, top, scale)
+  set_pen_size(scale)
+  draw_text(text, 128 - len(text) * 2 * scale, top)
+end

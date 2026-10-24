@@ -1,6 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_STAGE, type SpriteInit } from '@stitch/cart';
-import { NullRenderer, World, type CostumeInfo, type Program } from '@stitch/runtime';
+import { createCatalog, validateManifest, type Catalog } from '@stitch/ir';
+import {
+  Dict,
+  loadExtensions,
+  NullAudio,
+  NullNet,
+  NullRenderer,
+  World,
+  type CostumeInfo,
+  type HttpRequest,
+  type HttpResponse,
+  type NetOut,
+  type Program,
+  type WorldOptions,
+} from '@stitch/runtime';
 import { compile } from './compile';
 import { projectFrom } from './testing';
 
@@ -15,10 +29,17 @@ const box: CostumeInfo = {
 
 function run(
   sprites: Record<string, string>,
-  opts: { stage?: string; init?: Partial<SpriteInit> } = {},
+  opts: {
+    stage?: string;
+    init?: Partial<SpriteInit>;
+    audio?: NullAudio;
+    net?: NetOut;
+    catalog?: Catalog;
+    extensions?: WorldOptions['extensions'];
+  } = {},
 ) {
   const project = projectFrom(sprites, opts.stage);
-  const r = compile(project);
+  const r = compile(project, undefined, opts.catalog);
   if (!r.ok) throw new Error(JSON.stringify(r.diagnostics));
   const logs: string[] = [];
   const errors: string[] = [];
@@ -38,6 +59,14 @@ function run(
       ...opts.init,
     })),
     costumes: { box },
+    sounds: [
+      { id: 's1', name: 'coin', seconds: 0.25 },
+      { id: 's2', name: 'boom', seconds: 1 },
+    ],
+    songs: [{ id: 'm1', name: 'theme' }],
+    ...(opts.audio ? { audio: opts.audio } : {}),
+    ...(opts.net ? { net: opts.net } : {}),
+    ...(opts.extensions ? { extensions: opts.extensions } : {}),
     seed: 7,
     onLog: (_s, t) => logs.push(t),
     onError: (e) => errors.push(String(e.error)),
@@ -48,7 +77,7 @@ function run(
   const ticks = (n: number) => {
     for (let i = 0; i < n; i++) {
       world.tick();
-      renderer.render();
+      renderer.render(world);
     }
   };
   return { world, logs, errors, ticks, sprite: world.all[0]! };
@@ -248,5 +277,254 @@ end`,
     expect(after1).toBeLessThan(1000);
     world.tick();
     expect(world.all[0]!.x).toBeGreaterThan(after1);
+  });
+});
+
+describe('sound', () => {
+  const play = (src: string, n: number) => {
+    const audio = new NullAudio();
+    const r = run({ P: src }, { audio });
+    r.ticks(n);
+    return { ...r, audio };
+  };
+
+  it('plays sounds and songs by name or number', () => {
+    const { audio } = play(
+      'on start do\n  play_sound("coin")\n  play_sound(2)\n  play_sound("nope")\n  play_music("theme")\nend\n',
+      1,
+    );
+    expect(audio.calls).toEqual(['sound s1', 'sound s2', 'music m1']);
+  });
+
+  it('play_sound_wait waits the sound length in simulation ticks', () => {
+    const { sprite } = play(
+      'var done = 0\non start do\n  play_sound_wait("coin")\n  done = timer()\nend\n',
+      40,
+    );
+    // 0.25 s is 15 ticks; the next line runs once they have passed
+    expect(sprite.vars.done).toBeCloseTo(15 / 60);
+  });
+
+  it('clamps the volume to 0..100 and reports it', () => {
+    const { sprite, audio } = play(
+      'var v = 0\non start do\n  set_volume(150)\n  v = volume()\nend\n',
+      1,
+    );
+    expect(sprite.vars.v).toBe(100);
+    expect(audio.calls).toEqual(['volume 1']);
+  });
+
+  it('Stop silences sounds and music', () => {
+    const { world, audio } = play('on start do\n  play_music("theme")\nend\n', 1);
+    world.stopAll();
+    expect(audio.calls).toEqual(['music m1', 'stop sounds', 'stop music']);
+  });
+});
+
+/** Answers requests only when the test says so, like a slow network. */
+class FakeNet implements NetOut {
+  readonly sent: HttpRequest[] = [];
+  private waiting: ((r: HttpResponse) => void)[] = [];
+  request(req: HttpRequest): Promise<HttpResponse> {
+    this.sent.push(req);
+    return new Promise((resolve) => this.waiting.push(resolve));
+  }
+  /** Answers the oldest request, then lets its promise callbacks run (they run between ticks). */
+  async answer(r: HttpResponse) {
+    this.waiting.shift()!(r);
+    await Promise.resolve();
+  }
+}
+
+describe('data', () => {
+  it('http_get waits across ticks for the reply while other scripts keep running', async () => {
+    const net = new FakeNet();
+    const { sprite, ticks } = run(
+      {
+        p: [
+          'var body = "none"',
+          'var count = 0',
+          'on start do',
+          '  body = http_get("https://api.test/x")',
+          'end',
+          'on start do',
+          '  forever do',
+          '    count += 1',
+          '  end',
+          'end',
+        ].join('\n'),
+      },
+      { net },
+    );
+    ticks(5);
+    expect(net.sent).toEqual([{ method: 'GET', url: 'https://api.test/x' }]);
+    expect(sprite.vars.body).toBe('none');
+    expect(sprite.vars.count).toBe(5);
+    await net.answer({ status: 200, body: '{"ok":true}' });
+    ticks(1);
+    expect(sprite.vars.body).toBe('{"ok":true}');
+  });
+
+  it('http_post sends the body, and http_status reports the last reply per sprite', async () => {
+    const net = new FakeNet();
+    const { sprite, ticks } = run(
+      {
+        p: 'var s = -1\non start do\n  local r = http_post("https://api.test/y", "hi")\n  s = http_status()\nend',
+      },
+      { net },
+    );
+    ticks(1);
+    expect(net.sent).toEqual([{ method: 'POST', url: 'https://api.test/y', body: 'hi' }]);
+    await net.answer({ status: 404, body: 'nope' });
+    ticks(1);
+    expect(sprite.vars.s).toBe(404);
+  });
+
+  it('without a network every request reads as status 0 with an empty body', async () => {
+    const { sprite, ticks } = run({
+      p: 'var b = "x"\nvar s = -1\non start do\n  b = http_get("https://api.test")\n  s = http_status()\nend',
+    });
+    ticks(1);
+    await Promise.resolve();
+    ticks(1);
+    expect([sprite.vars.b, sprite.vars.s]).toEqual(['', 0]);
+  });
+
+  it('reads JSON: arrays as lists, objects as dictionaries, missing paths as ""', () => {
+    const { sprite, ticks } = run({
+      p: [
+        'var doc = "{\\"items\\": [{\\"name\\": \\"a\\", \\"n\\": 1}, {\\"name\\": \\"b\\", \\"n\\": 2}], \\"ok\\": true}"',
+        'var name = ""',
+        'var n = 0',
+        'var ok = false',
+        'var missing = 0',
+        'var items = 0',
+        'var nums = 0',
+        'var first = ""',
+        'var bad = 0',
+        'on start do',
+        '  name = json_get(doc, "items.2.name")',
+        '  n = json_get(doc, "items.1.n") + 1',
+        '  ok = json_get(doc, "ok")',
+        '  missing = json_get(doc, "items.3.name")',
+        '  items = json_get(doc, "items")',
+        '  nums = json_parse("[1, [2, 3], null]")',
+        '  first = json_get(items, "1.name")',
+        '  bad = json_parse("{oops")',
+        'end',
+      ].join('\n'),
+    });
+    ticks(1);
+    const v = sprite.vars;
+    expect([v.name, v.n, v.ok, v.missing]).toEqual(['b', 2, true, '']);
+    expect(v.items).toEqual([
+      new Dict([
+        ['name', 'a'],
+        ['n', 1],
+      ]),
+      new Dict([
+        ['name', 'b'],
+        ['n', 2],
+      ]),
+    ]);
+    expect(v.nums).toEqual([1, [2, 3], '']);
+    expect([v.first, v.bad]).toEqual(['a', '']);
+  });
+});
+
+describe('extensions', () => {
+  const r = validateManifest({
+    id: 'text',
+    name: 'Text',
+    version: '1',
+    color: '#123456',
+    blocks: [
+      { name: 'text_upper', kind: 'reporter', label: 'upper %1', params: [{ name: 's' }] },
+      { name: 'text_where', kind: 'reporter', label: 'where', params: [] },
+      {
+        name: 'text_later',
+        kind: 'reporter',
+        label: 'later %1',
+        params: [{ name: 'v' }],
+        waits: true,
+      },
+      { name: 'text_mutate', kind: 'command', label: 'mutate %1', params: [{ name: 'l' }] },
+      { name: 'text_bad', kind: 'reporter', label: 'bad', params: [] },
+    ],
+  });
+  if (!r.ok) throw new Error(r.errors.join());
+  const catalog = createCatalog([r.manifest]);
+  const source = {
+    id: 'text',
+    blocks: r.manifest.blocks.map((b) => ({ name: b.name, waits: b.waits === true })),
+    code: `
+      stitch.define('text_upper', (s) => String(s).toUpperCase());
+      stitch.define('text_where', (ctx) => ctx.sprite.name + '@' + ctx.sprite.x);
+      stitch.define('text_later', (v) => new Promise((ok) => setTimeout(() => ok({ got: v }), 1)));
+      stitch.define('text_mutate', (l) => { l.push('x'); });
+      stitch.define('text_bad', () => Promise.resolve(1));
+    `,
+  };
+  const load = () => loadExtensions([source], { net: new NullNet(), log: () => {} });
+
+  it('compiles extension calls and runs their implementations', async () => {
+    const { sprite, ticks, errors } = run(
+      {
+        p: [
+          'var a = ""',
+          'var b = ""',
+          'var c = ""',
+          'var l = [1]',
+          'on start do',
+          '  a = text_upper("hi")',
+          '  b = text_where()',
+          '  text_mutate(l)',
+          '  c = text_later(5)',
+          'end',
+        ].join('\n'),
+      },
+      { catalog, extensions: load().impls, init: { x: 12 } },
+    );
+    ticks(1);
+    expect([sprite.vars.a, sprite.vars.b, sprite.vars.l]).toEqual(['HI', 'p@12', [1]]);
+    await new Promise((ok) => setTimeout(ok, 5));
+    ticks(1);
+    expect(sprite.vars.c).toBe('{"got":5}');
+    expect(errors).toEqual([]);
+  });
+
+  it('reports a non-waiting block that returns a Promise', () => {
+    const { ticks, errors } = run(
+      { p: 'var v = 0\non start do\n  v = text_bad()\nend' },
+      { catalog, extensions: load().impls },
+    );
+    ticks(1);
+    expect(errors[0]).toMatch(/'text_bad' returned a Promise/);
+  });
+
+  it('without the catalog, extension calls are unknown functions', () => {
+    expect(() => run({ p: 'on start do\n  say(text_upper("a"))\nend' })).toThrow(
+      /unknown function 'text_upper'/,
+    );
+  });
+
+  it('reports load failures and missing blocks, and calls explain them', () => {
+    const broken = loadExtensions(
+      [
+        { ...source, id: 'boom', code: 'throw new Error("nope")' },
+        { ...source, id: 'half', code: 'stitch.define("text_upper", (s) => s)' },
+      ],
+      { net: new NullNet(), log: () => {} },
+    );
+    expect(broken.errors[0]).toEqual({ id: 'boom', message: 'nope' });
+    expect(broken.errors.slice(1).map((e) => e.message)).toContain(
+      "no implementation for 'text_where'",
+    );
+    expect(() =>
+      loadExtensions([{ ...source, code: 'stitch.define("nope", () => 1)' }], {
+        net: new NullNet(),
+        log: () => {},
+      }).impls.text_upper!({} as never),
+    ).toThrow(/isn't a block in this manifest/);
   });
 });

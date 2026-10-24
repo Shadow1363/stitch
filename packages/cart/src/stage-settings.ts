@@ -16,7 +16,12 @@ export interface StageSettings {
     filter: 'smooth' | 'pixel';
   };
   background: string;
+  /** Most clones alive at once; `create_clone` past it is an error (Scratch: 300, silently). */
+  cloneLimit: number;
 }
+
+/** Highest clone limit a cart may set. */
+export const MAX_CLONE_LIMIT = 10000;
 
 export const DEFAULT_STAGE: Readonly<StageSettings> = Object.freeze({
   width: 480,
@@ -25,6 +30,7 @@ export const DEFAULT_STAGE: Readonly<StageSettings> = Object.freeze({
   yAxis: 'up',
   scaling: Object.freeze({ mode: 'fit', filter: 'smooth' }),
   background: '#ffffff',
+  cloneLimit: 300,
 });
 
 const pick = <T extends string>(v: unknown, allowed: readonly T[], fallback: T): T =>
@@ -52,5 +58,12 @@ export function normalizeStage(input: unknown): StageSettings {
       filter: pick(sc.filter, ['smooth', 'pixel'], DEFAULT_STAGE.scaling.filter),
     },
     background: typeof s.background === 'string' ? s.background : DEFAULT_STAGE.background,
+    cloneLimit:
+      typeof s.cloneLimit === 'number' &&
+      Number.isInteger(s.cloneLimit) &&
+      s.cloneLimit >= 0 &&
+      s.cloneLimit <= MAX_CLONE_LIMIT
+        ? s.cloneLimit
+        : DEFAULT_STAGE.cloneLimit,
   };
 }

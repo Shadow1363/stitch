@@ -1,0 +1,61 @@
+-- The boss's bullets. The hidden original turns each request in the queue into a clone, with its
+-- own heading (Scratch directions: 0 up, 90 right), speed in pixels per tick, kind and spin
+-- (degrees the heading turns each tick, for curving bullets).
+var heading = 180
+var speed = 1
+var kind = 1
+var spin = 0
+-- How close each kind may come to the hit dot: round, needle, petal, big round.
+var radius = [3, 1.5, 2.5, 4]
+
+on start do
+  hide()
+  rotation_style("all around")
+  forever do
+    if len(queue) > 0 then
+      spawn_all()
+    end
+  end
+end
+
+warp function spawn_all()
+  for b in queue do
+    goto(b[1], b[2])
+    heading = b[3]
+    speed = b[4]
+    kind = b[5]
+    spin = b[6]
+    create_clone()
+  end
+  clear(queue)
+end
+
+on clone do
+  costume(kind)
+  point(heading)
+  show()
+  local reach = radius[kind]
+  forever do
+    if spin ~= 0 then
+      heading += spin
+      point(heading)
+    end
+    x += sin(heading) * speed
+    y -= cos(heading) * speed
+    if x < -8 or x > stage_width() + 8 or y < -8 or y > stage_height() + 8 then
+      delete_clone()
+    end
+    if safe == 0 and state == "play" and abs(x - px) < 6 and abs(y - py) < 6 then
+      if distance(x, y, px, py) < reach then
+        broadcast("player hit")
+        delete_clone()
+      end
+    end
+  end
+end
+
+on message "clear bullets" do
+  if is_clone() then
+    delete_clone()
+  end
+end

@@ -1,5 +1,6 @@
-import { BUILTINS, type BinaryOp } from '@stitch/ir';
-import { BUILTIN_LABELS, blockTypeOf } from './labels';
+import { BUILTINS, type BinaryOp, type Builtin, type Catalog } from '@stitch/ir';
+import { over } from './color';
+import { blockTypeOf, labelOf } from './labels';
 
 /** Block types that stand alone on the workspace and form the program. */
 export const TOP_TYPES = new Set([
@@ -8,6 +9,8 @@ export const TOP_TYPES = new Set([
   'stitch_on_start',
   'stitch_on_key',
   'stitch_on_message',
+  'stitch_on_clone',
+  'stitch_on_click',
   'stitch_raw_item',
 ]);
 
@@ -28,11 +31,17 @@ type Def = Record<string, unknown>;
 const STYLE_BY_CATEGORY: Record<string, string> = {
   motion: 'motion_blocks',
   looks: 'looks_blocks',
+  sound: 'sound_blocks',
   events: 'event_blocks',
   control: 'control_blocks',
+  clones: 'control_blocks',
   sensing: 'sensing_blocks',
+  map: 'map_blocks',
   math: 'operator_blocks',
+  strings: 'operator_blocks',
   lists: 'list_blocks',
+  pen: 'pen_blocks',
+  data: 'data_blocks',
   debug: 'debug_blocks',
 };
 
@@ -41,9 +50,9 @@ const value = (name: string) => ({ type: 'input_value', name });
 const text = (name: string, v = '') => ({ type: 'field_input', name, text: v });
 const body = (name = 'DO') => ({ message1: '%1', args1: [{ type: 'input_statement', name }] });
 
-function builtinDefs(): Def[] {
-  return [...BUILTINS.values()].map((b) => {
-    const label = BUILTIN_LABELS[b.name] ?? b.name;
+function builtinDefs(entries: Iterable<Builtin>): Def[] {
+  return [...entries].map((b) => {
+    const label = labelOf(b);
     // %n in the label is the nth parameter; Blockly needs args in order of appearance.
     const order = [...label.matchAll(/%(\d+)/g)].map((m) => Number(m[1]) - 1);
     let k = 0;
@@ -53,7 +62,7 @@ function builtinDefs(): Def[] {
       message0,
       args0: order.map((i) => value(`ARG${i}`)),
       inputsInline: true,
-      style: STYLE_BY_CATEGORY[b.category],
+      ...(b.ext ? { colour: b.ext.color } : { style: STYLE_BY_CATEGORY[b.category] }),
       tooltip: `${b.name}(${b.params.map((p) => p.name).join(', ')})`,
     };
     if (b.kind === 'command') Object.assign(def, stmt);
@@ -74,6 +83,7 @@ export const DEFINITIONS: Def[] = [
         name: 'SCOPE',
         options: [
           ['var', 'sprite'],
+          ['shared var', 'shared'],
           ['global var', 'global'],
         ],
       },
@@ -82,7 +92,8 @@ export const DEFINITIONS: Def[] = [
     ],
     inputsInline: true,
     style: 'variable_blocks',
-    tooltip: 'Declares a variable. Sprite variables belong to this sprite; globals are shared.',
+    tooltip:
+      'Declares a variable. var: this sprite, and each clone gets its own copy. shared var: one for the sprite and its clones. global var: one for everyone.',
   },
   {
     type: 'stitch_function',
@@ -114,6 +125,18 @@ export const DEFINITIONS: Def[] = [
     type: 'stitch_on_message',
     message0: 'when I receive %1',
     args0: [text('MSG', 'message1')],
+    nextStatement: null,
+    style: 'event_blocks',
+  },
+  {
+    type: 'stitch_on_clone',
+    message0: 'when I start as a clone',
+    nextStatement: null,
+    style: 'control_hat_blocks',
+  },
+  {
+    type: 'stitch_on_click',
+    message0: 'when this sprite clicked',
     nextStatement: null,
     style: 'event_blocks',
   },
@@ -219,7 +242,14 @@ export const DEFINITIONS: Def[] = [
     ...stmt,
     style: 'control_blocks',
   },
-  // `return` ends a block, so it has no next connection (same rule as the text grammar).
+  // `break`, `continue` and `return` end a block, so they have no next connection (as in text).
+  { type: 'stitch_break', message0: 'break', previousStatement: null, style: 'control_blocks' },
+  {
+    type: 'stitch_continue',
+    message0: 'continue',
+    previousStatement: null,
+    style: 'control_blocks',
+  },
   { type: 'stitch_return', message0: 'return', previousStatement: null, style: 'procedure_blocks' },
   {
     type: 'stitch_return_value',
@@ -394,21 +424,49 @@ export const DEFINITIONS: Def[] = [
     mutator: 'stitch_call_args',
   },
 
-  ...builtinDefs(),
+  ...builtinDefs(BUILTINS.values()),
 ];
 
-/** Scratch-like colours: [primary, secondary, tertiary]. */
-export const STYLES: Record<string, [string, string, string]> = {
-  motion_blocks: ['#4C97FF', '#4280D7', '#3373CC'],
-  looks_blocks: ['#9966FF', '#855CD6', '#774DCB'],
-  event_blocks: ['#FFBF00', '#E6AC00', '#CC9900'],
-  control_blocks: ['#FFAB19', '#EC9C13', '#CF8B17'],
-  logic_blocks: ['#FFAB19', '#EC9C13', '#CF8B17'],
-  sensing_blocks: ['#5CB1D6', '#47A8D1', '#2E8EB8'],
-  operator_blocks: ['#59C059', '#46B946', '#389438'],
-  variable_blocks: ['#FF8C1A', '#FF8000', '#DB6E00'],
-  list_blocks: ['#FF661A', '#FF5500', '#E64D00'],
-  procedure_blocks: ['#FF6680', '#FF4D6A', '#FF3355'],
-  debug_blocks: ['#8A8A8A', '#7A7A7A', '#5E5E5E'],
-  raw_blocks: ['#5B6770', '#4B565E', '#3B444A'],
+/** Definitions for the blocks extensions add to `catalog`; registered when a cart loads them. */
+export function extensionDefinitions(catalog: Catalog): Def[] {
+  return builtinDefs(catalog.all.filter((b) => b.ext));
+}
+
+/**
+ * Category colours: one primary per style, chosen so white block text meets WCAG AA (4.5:1) and
+ * every pair stays distinguishable with normal vision and under protanopia, deuteranopia and
+ * tritanopia (`palette.test.ts` checks both). Control and logic share a colour, as in Scratch.
+ */
+export const BLOCK_COLOURS: Record<string, string> = {
+  motion_blocks: '#1f5be1',
+  looks_blocks: '#5d22c4',
+  sound_blocks: '#5c1f66',
+  event_blocks: '#645c02',
+  control_blocks: '#ad6300',
+  logic_blocks: '#ad6300',
+  // Control's colour with a hat shape, for `when I start as a clone`.
+  control_hat_blocks: '#ad6300',
+  sensing_blocks: '#056682',
+  map_blocks: '#165853',
+  operator_blocks: '#30853b',
+  variable_blocks: '#bf1a00',
+  list_blocks: '#6e1a22',
+  procedure_blocks: '#c31c68',
+  data_blocks: '#704531',
+  debug_blocks: '#5a5f69',
+  // The one saturated hue left that clears AA, ΔE 12 and the CVD checks against the rest.
+  pen_blocks: '#a840a8',
+  raw_blocks: '#293940',
 };
+
+/** A builtin's block colour: its extension's, or its category's. */
+export const colourOf = (b: Pick<Builtin, 'category' | 'ext'>): string =>
+  b.ext?.color ?? BLOCK_COLOURS[STYLE_BY_CATEGORY[b.category] ?? 'debug_blocks']!;
+
+/** Blockly's [primary, secondary, tertiary]: secondary fills dropdowns, tertiary outlines. */
+export const STYLES: Record<string, [string, string, string]> = Object.fromEntries(
+  Object.entries(BLOCK_COLOURS).map(([k, c]) => [
+    k,
+    [c, over('#000000', c, 0.15), over('#000000', c, 0.3)],
+  ]),
+);

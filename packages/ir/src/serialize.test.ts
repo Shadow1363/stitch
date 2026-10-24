@@ -34,6 +34,10 @@ describe('serialize', () => {
     ).toThrow(/newer/);
   });
 
+  it('upgrades version 1 projects, which are a subset of version 2', () => {
+    expect(deserializeProject(JSON.stringify({ ...project, irVersion: 1 }))).toEqual(project);
+  });
+
   it('rejects data without a version', () => {
     expect(() => deserializeProject('{}')).toThrow(/irVersion/);
   });

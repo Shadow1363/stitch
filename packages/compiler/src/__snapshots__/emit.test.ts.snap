@@ -3,9 +3,9 @@
 exports[`emit > compiles loops, functions and waits 1`] = `
 ""use strict";
 const $ = rt.ops, B = rt.b;
-rt.defineModule("m0", function (S, V, G) {
+rt.defineModule("m0", function (S, V, G, P) {
 });
-rt.defineModule("m1", function (S, V, G) {
+rt.defineModule("m1", function (S, V, G, P) {
   V.items = [1, 2];
   function* f_fact($w, l_n) {
     if (($.cmp(l_n, 1) <= 0)) {
@@ -38,9 +38,9 @@ rt.instantiate({"$stage":"m0","P":"m1"});"
 exports[`emit > compiles the sample game 1`] = `
 ""use strict";
 const $ = rt.ops, B = rt.b;
-rt.defineModule("m0", function (S, V, G) {
+rt.defineModule("m0", function (S, V, G, P) {
 });
-rt.defineModule("m1", function (S, V, G) {
+rt.defineModule("m1", function (S, V, G, P) {
   V.vx = 3;
   rt.on(S, "start", null, function* () {
     while (true) {

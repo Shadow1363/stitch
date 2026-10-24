@@ -17,7 +17,7 @@ export function texturesFromCostumes(images: CostumeImage[], forcePixel: boolean
     const tex = Texture.from(img.bitmap);
     if (forcePixel || img.pixelArt) tex.source.scaleMode = 'nearest';
     textures.set(img.id, tex);
-    costumes[img.id] = {
+    const info: CostumeInfo = {
       id: img.id,
       name: img.name,
       width: img.bitmap.width,
@@ -25,6 +25,28 @@ export function texturesFromCostumes(images: CostumeImage[], forcePixel: boolean
       center: img.center,
       pixelArt: img.pixelArt,
     };
+    // Decoded on first use by touching/colour sensing; most costumes never need it.
+    let pixels: Uint8ClampedArray | undefined | null = null;
+    Object.defineProperty(info, 'pixels', {
+      get: () => (pixels === null ? (pixels = decode(img.bitmap)) : pixels),
+      enumerable: true,
+    });
+    costumes[img.id] = info;
   }
   return { textures, costumes };
+}
+
+/** RGBA of a bitmap, or undefined where there's no canvas to read it with. */
+function decode(bitmap: ImageBitmap): Uint8ClampedArray | undefined {
+  if (typeof OffscreenCanvas === 'undefined' || !bitmap.width || !bitmap.height) return undefined;
+  const ctx = new OffscreenCanvas(bitmap.width, bitmap.height).getContext('2d', {
+    willReadFrequently: true,
+  });
+  if (!ctx) return undefined;
+  try {
+    ctx.drawImage(bitmap, 0, 0);
+    return ctx.getImageData(0, 0, bitmap.width, bitmap.height).data;
+  } catch {
+    return undefined; // a closed bitmap: fall back to the costume's box
+  }
 }

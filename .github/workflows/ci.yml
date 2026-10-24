@@ -1,0 +1,34 @@
+# Every check from CLAUDE.md's command list, plus the player size budget.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          # 22.18+ runs the TypeScript build scripts directly (type stripping).
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      # Prettier covers .ts only (no Svelte plugin; see CLAUDE.md).
+      - run: pnpm exec prettier --check "**/*.ts"
+      # Includes the docs check: reference entries, examples, block pictures and links.
+      - run: pnpm test
+      - run: pnpm check:licenses
+      # Fails when the gzipped player bundle passes 500 KB.
+      - run: pnpm check:size
+      - run: pnpm build
+      # API docs from TSDoc; warnings (broken links) fail the build.
+      - run: pnpm docs:api
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:browser

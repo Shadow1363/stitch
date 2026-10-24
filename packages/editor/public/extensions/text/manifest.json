@@ -1,0 +1,95 @@
+{
+  "id": "text",
+  "name": "Text tools",
+  "version": "1.0.0",
+  "description": "String helpers: case, trimming, splitting and replacing.",
+  "color": "#2e8b57",
+  "main": "text.js",
+  "blocks": [
+    {
+      "name": "text_upper",
+      "kind": "reporter",
+      "label": "%1 in uppercase",
+      "description": "The text in capital letters.",
+      "params": [
+        {
+          "name": "text",
+          "type": "string",
+          "default": "hello"
+        }
+      ],
+      "returns": "string"
+    },
+    {
+      "name": "text_lower",
+      "kind": "reporter",
+      "label": "%1 in lowercase",
+      "description": "The text in small letters.",
+      "params": [
+        {
+          "name": "text",
+          "type": "string",
+          "default": "HELLO"
+        }
+      ],
+      "returns": "string"
+    },
+    {
+      "name": "text_trim",
+      "kind": "reporter",
+      "label": "trim %1",
+      "description": "The text without spaces at the start and end.",
+      "params": [
+        {
+          "name": "text",
+          "type": "string",
+          "default": "  hi  "
+        }
+      ],
+      "returns": "string"
+    },
+    {
+      "name": "text_split",
+      "kind": "reporter",
+      "label": "split %1 at %2",
+      "description": "The parts of the text between separators, as a list.",
+      "params": [
+        {
+          "name": "text",
+          "type": "string",
+          "default": "a,b,c"
+        },
+        {
+          "name": "separator",
+          "type": "string",
+          "default": ","
+        }
+      ],
+      "returns": "list"
+    },
+    {
+      "name": "text_replace",
+      "kind": "reporter",
+      "label": "replace %2 with %3 in %1",
+      "description": "The text with every `find` replaced by `with`.",
+      "params": [
+        {
+          "name": "text",
+          "type": "string",
+          "default": "hello world"
+        },
+        {
+          "name": "find",
+          "type": "string",
+          "default": "world"
+        },
+        {
+          "name": "with",
+          "type": "string",
+          "default": "Stitch"
+        }
+      ],
+      "returns": "string"
+    }
+  ]
+}

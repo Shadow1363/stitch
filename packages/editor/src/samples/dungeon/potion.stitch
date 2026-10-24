@@ -1,0 +1,57 @@
+-- Potions: the hidden original makes one clone per potion. Walk onto one to heal.
+var cx = 0
+var cy = 0
+
+on start do
+  hide()
+end
+
+on message "spawn" do
+  if not is_clone() then
+    spawn_all()
+  end
+end
+
+warp function spawn_all()
+  for spot in potion_spots do
+    cx = spot["x"]
+    cy = spot["y"]
+    create_clone()
+  end
+end
+
+on clone do
+  set_cell(loot, cx, cy, my_id())
+  goto(cx * 8 - 4, cy * 8 - 4)
+end
+
+on message "clear" do
+  if is_clone() then
+    delete_clone()
+  end
+end
+
+on message "look" do
+  if is_clone() then
+    if cell(visible, cx, cy) == 1 then
+      show()
+    else
+      hide()
+    end
+  end
+end
+
+on message "game over" do
+  hide()
+end
+
+-- The player stepped on this potion.
+on message "pickup" do
+  if my_id() == target then
+    health = min(health + 5, max_health)
+    push(messages, "YOU DRINK A POTION")
+    play_sound("pickup")
+    set_cell(loot, cx, cy, "")
+    delete_clone()
+  end
+end

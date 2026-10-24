@@ -1,5 +1,6 @@
 import {
-  getBuiltin,
+  CORE_CATALOG,
+  type Catalog,
   isSpriteProp,
   type AssignOp,
   type BinaryOp,
@@ -25,11 +26,24 @@ export interface FromBlocksResult {
 
 const typeName = (t: string) => /^stitch_[br]_(.+)$/.exec(t)?.[1];
 
+/** Builtins for the conversion in progress; set for the duration of one synchronous call. */
+let catalog: Catalog = CORE_CATALOG;
+
 /**
  * Blockly top-level blocks -> IR. Every program block maps to exactly one IR node and keeps its
  * id. Empty inputs read as the slot's neutral value (false, 0 or ""), as Scratch treats them.
  */
-export function fromBlocks(top: BlockJson[]): FromBlocksResult {
+export function fromBlocks(top: BlockJson[], cat: Catalog = CORE_CATALOG): FromBlocksResult {
+  const outer = catalog;
+  catalog = cat;
+  try {
+    return convert(top);
+  } finally {
+    catalog = outer;
+  }
+}
+
+function convert(top: BlockJson[]): FromBlocksResult {
   const items: TopItem[] = [];
   const layout: Record<string, Position> = {};
   const loose: BlockJson[] = [];
@@ -55,6 +69,8 @@ function trivia(b: BlockJson): { trivia?: Trivia } {
   return { trivia: { comments: text.split('\n').map((l) => (l === '' ? '' : ' ' + l)) } };
 }
 
+const SCOPES = ['sprite', 'shared', 'global'] as const;
+
 function topItem(b: BlockJson): TopItem {
   const id = b.id;
   const t = trivia(b);
@@ -63,7 +79,7 @@ function topItem(b: BlockJson): TopItem {
       return {
         id,
         kind: 'VarDecl',
-        scope: field(b, 'SCOPE') === 'global' ? 'global' : 'sprite',
+        scope: SCOPES.find((s) => s === field(b, 'SCOPE')) ?? 'sprite',
         name: field(b, 'NAME'),
         init: value(b, 'INIT', 'string'),
         ...t,
@@ -81,6 +97,10 @@ function topItem(b: BlockJson): TopItem {
     }
     case 'stitch_on_start':
       return { id, kind: 'EventScript', event: { type: 'start' }, body: seq(b.next?.block), ...t };
+    case 'stitch_on_clone':
+      return { id, kind: 'EventScript', event: { type: 'clone' }, body: seq(b.next?.block), ...t };
+    case 'stitch_on_click':
+      return { id, kind: 'EventScript', event: { type: 'click' }, body: seq(b.next?.block), ...t };
     case 'stitch_on_key':
       return {
         id,
@@ -188,6 +208,10 @@ function stmtNode(b: BlockJson): Stmt {
       return { id, kind: 'WaitUntil', cond: value(b, 'COND', 'boolean') };
     case 'stitch_return':
       return { id, kind: 'Return' };
+    case 'stitch_break':
+      return { id, kind: 'Break' };
+    case 'stitch_continue':
+      return { id, kind: 'Continue' };
     case 'stitch_return_value':
       return { id, kind: 'Return', value: value(b, 'VALUE', 'string') };
     case 'stitch_raw':
@@ -218,7 +242,7 @@ function call(b: BlockJson, id: string): Call {
       ? field(b, 'NAME')
       : typeName(b.type)!;
   const builtin =
-    b.type === 'stitch_call' || b.type === 'stitch_call_expr' ? undefined : getBuiltin(name);
+    b.type === 'stitch_call' || b.type === 'stitch_call_expr' ? undefined : catalog.get(name);
   const count = builtin ? builtin.params.length : Number(b.extraState?.args ?? 0);
   const args = Array.from({ length: count }, (_, i) =>
     value(b, `ARG${i}`, builtin?.params[i]?.type === 'number' ? 'number' : 'string'),

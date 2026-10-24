@@ -1,0 +1,158 @@
+import type { DocSection } from '../registry';
+
+export const math: DocSection = {
+  id: 'math',
+  title: 'Math',
+  entries: [
+    {
+      id: 'abs',
+      doc: 'Absolute value.',
+      example: `say(abs(-5))`,
+      alt: 'say abs of -5',
+    },
+    {
+      id: 'floor',
+      doc: 'Rounds down.',
+      example: `say(floor(2.7))`,
+      alt: 'say floor of 2.7',
+    },
+    {
+      id: 'ceil',
+      doc: 'Rounds up.',
+      example: `say(ceil(2.1))`,
+      alt: 'say ceiling of 2.1',
+    },
+    {
+      id: 'round',
+      doc: 'Rounds to the nearest whole number.',
+      example: `say(round(2.5))`,
+      alt: 'say round 2.5',
+    },
+    {
+      id: 'sqrt',
+      doc: 'Square root.',
+      example: `say(sqrt(16))`,
+      alt: 'say sqrt of 16',
+    },
+    {
+      id: 'sin',
+      doc: 'Sine.',
+      example: `y = sin(timer() * 90) * 50`,
+      alt: 'set y to sin of (timer * 90) * 50',
+    },
+    {
+      id: 'cos',
+      doc: 'Cosine.',
+      example: `x = cos(timer() * 90) * 50`,
+      alt: 'set x to cos of (timer * 90) * 50',
+    },
+    {
+      id: 'tan',
+      doc: 'Tangent.',
+      example: `say(tan(45))`,
+      alt: 'say tan of 45',
+    },
+    {
+      id: 'min',
+      doc: 'The smaller value.',
+      example: `speed = min(speed + 1, 10)`,
+      alt: 'set speed to min of (speed + 1) and 10',
+    },
+    {
+      id: 'max',
+      doc: 'The larger value.',
+      example: `lives = max(lives - 1, 0)`,
+      alt: 'set lives to max of (lives - 1) and 0',
+    },
+    {
+      id: 'random',
+      doc: 'A random number between `from` and `to`, both included. Whole numbers when both are whole, decimals otherwise. Each Run gets a new random seed.',
+      example: `goto(random(-200, 200), random(-150, 150))`,
+      alt: 'go to x (pick random -200 to 200) y (pick random -150 to 150)',
+    },
+    {
+      id: 'random_int',
+      doc: 'A random whole number from `from` to `to`, both included, whatever kind of numbers you give it.',
+      example: `local roll = random_int(1, 6)`,
+      alt: 'local roll = random integer 1 to 6',
+    },
+    {
+      id: 'set_seed',
+      doc: 'Restarts the random numbers from a seed, so `random` and `random_int` give the same sequence every run. Handy for levels you want to share or test.',
+      example: `set_seed(1234)`,
+      alt: 'set random seed to 1234',
+    },
+    {
+      id: 'clamp',
+      doc: '`x`, kept between `low` and `high`.',
+      example: `hp = clamp(hp + 5, 0, max_hp)`,
+      alt: 'set hp to clamp hp + 5 between 0 and max_hp',
+    },
+    {
+      id: 'lerp',
+      doc: 'The value `t` of the way from `a` to `b` (`t` = 0 gives `a`, 1 gives `b`).',
+      example: `x = lerp(x, target_x, 0.1)`,
+      alt: 'set x to lerp x to target_x by 0.1',
+    },
+    {
+      id: 'sign',
+      doc: '1 for positive numbers, -1 for negative, 0 for zero.',
+      example: `x += sign(dx)`,
+      alt: 'change x by sign of dx',
+    },
+    {
+      id: 'distance',
+      doc: 'The distance between two points.',
+      example: `print(distance(0, 0, 30, 40))`,
+      alt: 'print distance from x 0 y 0 to x 30 y 40',
+    },
+    {
+      id: 'angle',
+      doc: "The direction from the first point to the second, in Scratch's convention (0 up, 90 right).",
+      example: `point(angle(x, y, 0, 0))`,
+      alt: 'point in direction direction from x x y y to x 0 y 0',
+    },
+    {
+      id: 'asin',
+      doc: 'Arcsine, in degrees.',
+      example: `print(asin(1))`,
+      alt: 'print asin of 1',
+    },
+    {
+      id: 'acos',
+      doc: 'Arccosine, in degrees.',
+      example: `print(acos(1))`,
+      alt: 'print acos of 1',
+    },
+    {
+      id: 'atan',
+      doc: 'Arctangent, in degrees.',
+      example: `print(atan(1))`,
+      alt: 'print atan of 1',
+    },
+    {
+      id: 'ln',
+      doc: 'Natural logarithm.',
+      example: `print(ln(1))`,
+      alt: 'print ln of 1',
+    },
+    {
+      id: 'log',
+      doc: 'Logarithm base 10.',
+      example: `print(log(100))`,
+      alt: 'print log of 100',
+    },
+    {
+      id: 'exp',
+      doc: 'e to the power x.',
+      example: `print(exp(1))`,
+      alt: 'print e ^ 1',
+    },
+    {
+      id: 'pow10',
+      doc: '10 to the power x.',
+      example: `print(pow10(3))`,
+      alt: 'print 10 ^ 3',
+    },
+  ],
+};

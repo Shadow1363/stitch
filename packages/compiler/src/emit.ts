@@ -1,6 +1,7 @@
 import {
-  getBuiltin,
+  CORE_CATALOG,
   stripIds,
+  type Catalog,
   type Block,
   type Diagnostic,
   type Expr,
@@ -14,7 +15,8 @@ import {
 
 /**
  * IR -> JavaScript. Output targets the RuntimeApi in @stitch/runtime (core/world.ts):
- *   rt.defineModule(id, (S, V, G) => { ...vars; function* f_name() {}; rt.on(S, event, arg, function* () {}) })
+ *   rt.defineModule(id, (S, V, G, P) => { ...vars; function* f_name() {}; rt.on(S, event, arg, function* () {}) })
+ * V: this sprite's (or clone's) variables, P: variables its clones share, G: globals.
  *   rt.instantiate({ spriteId: moduleId })
  * Every loop iteration ends in `yield` (one iteration per tick). User functions are generators.
  */
@@ -67,6 +69,7 @@ class Writer {
 export function emitProject(
   project: Project,
   spriteOrder: string[] = project.sprites.map((s) => s.id),
+  catalog: Catalog = CORE_CATALOG,
 ): Emitted {
   const w = new Writer();
   const diagnostics: Diagnostic[] = [];
@@ -90,9 +93,9 @@ export function emitProject(
     if (!mid) {
       mid = `m${moduleIds.size}`;
       moduleIds.set(key, mid);
-      new ModuleEmitter(w, f.module, globals, (d) => diagnostics.push({ ...d, file: f.name })).emit(
-        mid,
-      );
+      new ModuleEmitter(w, f.module, globals, catalog, (d) =>
+        diagnostics.push({ ...d, file: f.name }),
+      ).emit(mid);
     }
     instances[f.id] = mid;
   }
@@ -102,8 +105,21 @@ export function emitProject(
   return { code: w.lines.join('\n'), lineMap: w.map, diagnostics };
 }
 
+/** True when `b` has a `break`/`continue` for the loop that owns it (not one in a nested loop). */
+function hasJump(b: Block): boolean {
+  return b.stmts.some((s) => {
+    if (s.kind === 'Break' || s.kind === 'Continue') return true;
+    if (s.kind === 'If')
+      return [s.then, ...s.elifs.map((e) => e.body), ...(s.else ? [s.else] : [])].some(hasJump);
+    return false;
+  });
+}
+
 class ModuleEmitter {
   private spriteVars = new Set<string>();
+  private sharedVars = new Set<string>();
+  /** Labels of the enclosing loops: `brk` ends the loop, `cont` ends the current iteration. */
+  private loops: { brk: string; cont: string }[] = [];
   private functions = new Set<string>();
   private scopes: Map<string, string>[] = [];
   /** Inside a user function, where `$w` (warp flag) is in scope. */
@@ -114,17 +130,19 @@ class ModuleEmitter {
     private w: Writer,
     private m: Module,
     private globals: ReadonlySet<string>,
+    private catalog: Catalog,
     private report: (d: Diagnostic) => void,
   ) {
     for (const it of m.items) {
       if (it.kind === 'VarDecl' && it.scope === 'sprite') this.spriteVars.add(it.name);
+      if (it.kind === 'VarDecl' && it.scope === 'shared') this.sharedVars.add(it.name);
       if (it.kind === 'FunctionDef') this.functions.add(it.name);
     }
   }
 
   emit(mid: string) {
     const w = this.w;
-    w.line(`rt.defineModule(${JSON.stringify(mid)}, function (S, V, G) {`);
+    w.line(`rt.defineModule(${JSON.stringify(mid)}, function (S, V, G, P) {`);
     w.indent();
     for (const it of this.m.items) {
       if (it.kind !== 'VarDecl') continue;
@@ -137,9 +155,12 @@ class ModuleEmitter {
         continue;
       }
       const v = this.expr(it.init).js;
-      if (it.scope === 'global')
-        w.line(`if (!(${JSON.stringify(it.name)} in G)) G.${it.name} = ${v};`, it.id);
-      else w.line(`V.${it.name} = ${v};`, it.id);
+      if (it.scope === 'sprite') w.line(`V.${it.name} = ${v};`, it.id);
+      else {
+        // Globals and shared vars start once, however many sprites or clones declare them.
+        const rec = it.scope === 'global' ? 'G' : 'P';
+        w.line(`if (!(${JSON.stringify(it.name)} in ${rec})) ${rec}.${it.name} = ${v};`, it.id);
+      }
     }
     for (const it of this.m.items) if (it.kind === 'FunctionDef') this.fn(it);
     for (const it of this.m.items) {
@@ -179,7 +200,7 @@ class ModuleEmitter {
   /** Initialisers run once at load, outside any thread: no waiting, no user functions. */
   private pureInit(e: Expr): boolean {
     if (e.kind === 'Call') {
-      const b = getBuiltin(e.name);
+      const b = this.catalog.get(e.name);
       if (!b || b.yields) return false;
     }
     const kids: Expr[] =
@@ -209,12 +230,39 @@ class ModuleEmitter {
     this.w.dedent();
   }
 
-  private loopBody(b: Block, loopVar?: { name: string; js: string }) {
+  /**
+   * A loop: `header {`, then the body and the per-iteration yield. When the body uses `break` or
+   * `continue`, the loop gets a label and the body a labelled block, so `continue` jumps to the
+   * end of the body and the yield still runs (rule 9).
+   */
+  private loop(
+    header: string,
+    id: NodeId,
+    b: Block,
+    loopVar?: { name: string; js: string; init: string },
+  ) {
+    const w = this.w;
+    const jumps = hasJump(b);
+    const brk = jumps ? this.temp('L') : '';
+    const cont = jumps ? this.temp('C') : '';
+    w.line(`${jumps ? `${brk}: ` : ''}${header} {`, id);
+    w.indent();
+    if (loopVar) w.line(`let ${loopVar.js} = ${loopVar.init};`);
+    if (jumps) w.line(`${cont}: {`);
+    w.dedent();
+    if (jumps) w.indent();
+    this.loops.push({ brk, cont });
     this.block(b, loopVar);
-    this.w.indent();
+    this.loops.pop();
+    if (jumps) {
+      w.line('}');
+      w.dedent();
+    }
+    w.indent();
     // Warp code skips the per-iteration yield, but still yields once a tick runs past its budget.
-    this.w.line(this.inFunction ? 'if (!$w || rt.overBudget()) yield;' : 'yield;');
-    this.w.dedent();
+    w.line(this.inFunction ? 'if (!$w || rt.overBudget()) yield;' : 'yield;');
+    w.dedent();
+    w.line('}');
   }
 
   private stmt(s: Stmt, scope: Map<string, string>) {
@@ -253,55 +301,45 @@ class ModuleEmitter {
         return;
       }
       case 'Forever':
-        w.line('while (true) {', s.id);
-        this.loopBody(s.body);
-        w.line('}');
-        return;
+        return this.loop('while (true)', s.id, s.body);
       case 'Repeat': {
         const i = this.temp('i');
         const n = this.temp('n');
-        w.line(
-          `for (let ${i} = 0, ${n} = Math.round(${this.num(s.count)}); ${i} < ${n}; ${i}++) {`,
+        return this.loop(
+          `for (let ${i} = 0, ${n} = Math.round(${this.num(s.count)}); ${i} < ${n}; ${i}++)`,
           s.id,
+          s.body,
         );
-        this.loopBody(s.body);
-        w.line('}');
-        return;
       }
       case 'RepeatUntil':
-        w.line(`while (!${this.bool(s.cond)}) {`, s.id);
-        this.loopBody(s.body);
-        w.line('}');
-        return;
+        return this.loop(`while (!${this.bool(s.cond)})`, s.id, s.body);
       case 'While':
-        w.line(`while (${this.bool(s.cond)}) {`, s.id);
-        this.loopBody(s.body);
-        w.line('}');
-        return;
+        return this.loop(`while (${this.bool(s.cond)})`, s.id, s.body);
       case 'ForRange': {
         const c = this.temp('c');
         const e = this.temp('e');
         const st = this.temp('s');
         const step = s.step ? this.num(s.step) : '1';
-        w.line(
-          `for (let ${c} = ${this.num(s.from)}, ${e} = ${this.num(s.to)}, ${st} = ${step}; ${st} >= 0 ? ${c} <= ${e} : ${c} >= ${e}; ${c} += ${st}) {`,
+        return this.loop(
+          `for (let ${c} = ${this.num(s.from)}, ${e} = ${this.num(s.to)}, ${st} = ${step}; ${st} >= 0 ? ${c} <= ${e} : ${c} >= ${e}; ${c} += ${st})`,
           s.id,
+          s.body,
+          { name: s.var, js: `l_${s.var}`, init: c },
         );
-        w.indent();
-        w.line(`let l_${s.var} = ${c};`);
-        w.dedent();
-        this.loopBody(s.body, { name: s.var, js: `l_${s.var}` });
-        w.line('}');
-        return;
       }
       case 'ForEach': {
         const v = this.temp('v');
-        w.line(`for (const ${v} of $.iter(${this.expr(s.list).js})) {`, s.id);
-        w.indent();
-        w.line(`let l_${s.var} = ${v};`);
-        w.dedent();
-        this.loopBody(s.body, { name: s.var, js: `l_${s.var}` });
-        w.line('}');
+        return this.loop(`for (const ${v} of $.iter(${this.expr(s.list).js}))`, s.id, s.body, {
+          name: s.var,
+          js: `l_${s.var}`,
+          init: v,
+        });
+      }
+      case 'Break':
+      case 'Continue': {
+        const l = this.loops[this.loops.length - 1];
+        // Validation reports a jump outside a loop; emit nothing so the line map stays useful.
+        if (l) w.line(`break ${s.kind === 'Break' ? l.brk : l.cont};`, s.id);
         return;
       }
       case 'WaitUntil':
@@ -352,6 +390,7 @@ class ModuleEmitter {
       if (js) return js;
     }
     if (this.spriteVars.has(name)) return `V.${name}`;
+    if (this.sharedVars.has(name)) return `P.${name}`;
     if (this.globals.has(name)) return `G.${name}`;
     // Validation reports unknown names; keep emitting so the line map stays useful.
     return `V.${name}`;
@@ -442,7 +481,7 @@ class ModuleEmitter {
         js: `(yield* f_${e.name}(${[this.inFunction ? '$w' : 'false', ...e.args.map((a) => this.expr(a).js)].join(', ')}))`,
         t: 'any',
       };
-    const b = getBuiltin(e.name);
+    const b = this.catalog.get(e.name);
     if (!b) return { js: `B.${e.name}()`, t: 'any' };
     const inline = MATH_INLINE[e.name];
     if (inline)

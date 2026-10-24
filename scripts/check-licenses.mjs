@@ -5,11 +5,19 @@ import { execSync } from 'node:child_process';
 
 const ALLOW = new Set(['MIT', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'ISC', '0BSD']);
 
+/**
+ * Font files (no code) may be SIL OFL-1.1, approved by the owner for Phase 7. Only these
+ * packages, which ship nothing but CSS and font files, may use it.
+ */
+const FONT_LICENSES = new Set(['OFL-1.1']);
+const FONT_PACKAGES = new Set(['@fontsource/inter', '@fontsource/jetbrains-mono']);
+
 /** Build/lint tools that never end up in the editor, runtime or exports. */
 const DEV_EXCEPTIONS = {
   lightningcss: 'MPL-2.0; Vite 8 CSS tooling, build-time only (pending owner approval)',
   'lightningcss-darwin-arm64': 'MPL-2.0; native binary of lightningcss (pending owner approval)',
   minimatch: 'BlueOak-1.0.0 (permissive); used by eslint (pending owner approval)',
+  argparse: 'Python-2.0 (permissive); typedoc → markdown-it, API docs only (pending owner approval)',
 };
 
 const list = (prod) =>
@@ -24,11 +32,13 @@ const allowed = (license) => license.split(/\s+OR\s+|[()]/).some((l) => ALLOW.ha
 const failures = [];
 for (const [license, pkgs] of Object.entries(list(true)))
   if (!allowed(license))
-    for (const p of pkgs) failures.push(`shipped: ${p.name}@${p.versions?.join(',')} — ${license}`);
+    for (const p of pkgs)
+      if (!(FONT_LICENSES.has(license) && FONT_PACKAGES.has(p.name)))
+        failures.push(`shipped: ${p.name}@${p.versions?.join(',')} — ${license}`);
 for (const [license, pkgs] of Object.entries(list(false)))
   if (!allowed(license))
     for (const p of pkgs)
-      if (!(p.name in DEV_EXCEPTIONS))
+      if (!(p.name in DEV_EXCEPTIONS) && !(FONT_LICENSES.has(license) && FONT_PACKAGES.has(p.name)))
         failures.push(`dev: ${p.name}@${p.versions?.join(',')} — ${license}`);
 
 if (failures.length) {
@@ -36,7 +46,7 @@ if (failures.length) {
   process.exit(1);
 }
 console.log(
-  'Licenses OK. Dev-only exceptions:\n  ' +
+  `Licenses OK. Fonts (${[...FONT_LICENSES].join(', ')}): ${[...FONT_PACKAGES].join(', ')}.\nDev-only exceptions:\n  ` +
     Object.entries(DEV_EXCEPTIONS)
       .map(([k, v]) => `${k}: ${v}`)
       .join('\n  '),

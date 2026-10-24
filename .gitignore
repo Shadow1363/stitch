@@ -1,7 +1,9 @@
 node_modules/
 dist/
 .vite/
+.vitest/
 coverage/
 *.log
 .DS_Store
 __screenshots__/
+docs/api/

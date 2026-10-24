@@ -1,16 +1,16 @@
-import { normalizeStage, type CartV1, type ImageAsset } from '@stitch/cart';
+import { decodeTiles } from '@stitch/cart';
 import { compile, nodeAtLine, type CompileResult } from '@stitch/compiler';
 import { IR_VERSION, type Diagnostic, type Project } from '@stitch/ir';
 import type { Span } from '@stitch/lang';
-import type { CostumeImage, LoadPayload } from '@stitch/runtime/protocol';
+import { extensionSource } from '@stitch/runtime';
+import type { LoadPayload } from '@stitch/runtime/protocol';
 import sampleCart from '../samples/bounce/cart.json';
 import playerSource from '../samples/bounce/player.stitch?raw';
-import { SourceDoc } from './doc';
+import { renderCostumes } from './assets';
+import { Session, STAGE_FILE } from './session';
+import { stageClips } from './sound';
 
-export const STAGE_FILE = '$stage';
-
-/** Everything in a cart except the program, which comes from the source docs. */
-export type CartShell = Omit<CartV1, 'project'>;
+export { STAGE_FILE };
 
 export interface Located extends Diagnostic {
   fileId?: string;
@@ -25,38 +25,34 @@ export interface Build {
   where: Map<string, { fileId: string; span: Span }>;
 }
 
-export function loadSample(): { shell: CartShell; docs: SourceDoc[] } {
-  const raw = sampleCart as unknown as CartShell;
-  const shell: CartShell = { ...raw, stage: normalizeStage(raw.stage) };
-  const docs = [
-    new SourceDoc(STAGE_FILE, 'Stage', '-- Stage scripts and global variables go here.\n'),
-    new SourceDoc('player', 'Player', playerSource),
-  ];
-  return { shell, docs };
+export function loadSample(): Session {
+  const raw = sampleCart as unknown as Parameters<typeof Session.fromSources>[0];
+  return Session.fromSources(raw, { player: playerSource });
 }
 
 /** Assembles the project from each doc's IR and compiles it. */
-export function build(shell: CartShell, docs: SourceDoc[]): Build {
+export function build(session: Session): Build {
   const where = new Map<string, { fileId: string; span: Span }>();
   const syntax: Located[] = [];
-  const byId = new Map(docs.map((d) => [d.id, d]));
-  for (const d of docs) {
+  for (const d of session.docs) {
     for (const [id, span] of d.spans) where.set(id, { fileId: d.id, span });
     for (const s of d.syntax)
       syntax.push({ severity: 'error', message: s.message, fileId: d.id, span: s, file: d.name });
   }
   const project: Project = {
     irVersion: IR_VERSION,
-    stage: byId.get(STAGE_FILE)?.module ?? { items: [] },
-    sprites: shell.sprites.map((s) => ({
+    stage: session.doc(STAGE_FILE)?.module ?? { items: [] },
+    sprites: session.sprites.map((s) => ({
       id: s.id,
       name: s.name,
-      module: byId.get(s.id)?.module ?? { items: [] },
+      module: session.doc(s.id)?.module ?? { items: [] },
     })),
   };
   const compiled = compile(
     project,
-    shell.sprites.map((s) => s.id),
+    session.sprites.map((s) => s.id),
+    session.catalog,
+    session.names(),
   );
   const semantic: Located[] = compiled.diagnostics
     .filter((d) => !d.message.startsWith('syntax error'))
@@ -74,37 +70,23 @@ export function locateRuntimeError(b: Build, line: number | undefined) {
   return id ? b.where.get(id) : undefined;
 }
 
-const blobs = new Map<string, Promise<Blob>>();
-
-/** Decodes fresh ImageBitmaps for every costume (they are transferred, so never reused). */
-export async function decodeCostumes(shell: CartShell): Promise<CostumeImage[]> {
-  const entries = Object.entries(shell.assets) as [string, ImageAsset][];
-  return Promise.all(
-    entries.map(async ([id, a]) => {
-      let blob = blobs.get(a.data);
-      if (!blob) {
-        blob = fetch(a.data).then((r) => {
-          if (!r.ok) throw new Error(`asset ${a.name}: HTTP ${r.status}`);
-          return r.blob();
-        });
-        blobs.set(a.data, blob);
-      }
-      return {
-        id,
-        name: a.name,
-        bitmap: await createImageBitmap(await blob),
-        pixelArt: a.pixelArt,
-        center: a.center,
-      };
-    }),
-  );
-}
-
-export async function payloadFor(shell: CartShell, b: Build): Promise<LoadPayload> {
-  return {
+export async function payloadFor(session: Session, b: Build): Promise<LoadPayload> {
+  const p: LoadPayload = {
     code: b.compiled.code,
-    stage: shell.stage,
-    sprites: shell.sprites,
-    costumes: await decodeCostumes(shell),
+    stage: session.stage,
+    sprites: session.sprites,
+    costumes: await renderCostumes(session.assets, session.palette),
+    ...stageClips(session.sounds, session.music),
+    extensions: session.extensions.map(extensionSource),
   };
+  const m = session.map;
+  if (m)
+    p.map = {
+      tileset: m.tileset,
+      tileSize: m.tileSize,
+      width: m.width,
+      height: m.height,
+      cells: decodeTiles(m),
+    };
+  return p;
 }

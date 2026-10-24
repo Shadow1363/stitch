@@ -1,7 +1,7 @@
-import { BUILTINS, type Builtin } from '@stitch/ir';
+import { CORE_CATALOG, type Builtin, type Catalog } from '@stitch/ir';
 import { STYLES } from './definitions';
 import type { InputJson } from './json';
-import { blockTypeOf, TOOLBOX_DEFAULTS } from './labels';
+import { blockTypeOf, defaultOf } from './labels';
 import { defaultShadow, numBlock, strBlock } from './toBlocks';
 
 /** What the dynamic Variables / Functions categories list. */
@@ -30,12 +30,10 @@ const blk = (type: string, extra: Partial<ToolboxItem> = {}): ToolboxItem => ({
   ...extra,
 });
 
-function builtin(name: string): ToolboxItem {
-  const b = BUILTINS.get(name) as Builtin;
-  const defaults = TOOLBOX_DEFAULTS[name] ?? [];
+function entry(b: Builtin): ToolboxItem {
   const inputs: Record<string, InputJson> = {};
   b.params.forEach((p, i) => {
-    const d = defaults[i];
+    const d = defaultOf(b, i);
     const sh =
       d === undefined
         ? defaultShadow(p.type, sid())
@@ -47,14 +45,38 @@ function builtin(name: string): ToolboxItem {
   return blk(blockTypeOf(b), { inputs });
 }
 
+const builtin = (name: string) => entry(CORE_CATALOG.get(name)!);
+
 const byCategory = (cat: Builtin['category']) =>
-  [...BUILTINS.values()].filter((b) => b.category === cat).map((b) => builtin(b.name));
+  CORE_CATALOG.all.filter((b) => b.category === cat).map(entry);
+
+/** One toolbox category per extension in `catalog`, after the core ones. */
+function extensionCategories(catalog: Catalog) {
+  const cats = new Map<
+    string,
+    { kind: string; name: string; colour: string; contents: ToolboxItem[] }
+  >();
+  for (const b of catalog.all) {
+    if (!b.ext) continue;
+    let c = cats.get(b.ext.id);
+    if (!c)
+      cats.set(
+        b.ext.id,
+        (c = { kind: 'category', name: b.ext.name, colour: b.ext.color, contents: [] }),
+      );
+    c.contents.push(entry(b));
+  }
+  return [...cats.values()];
+}
 
 const binary = (type: string, op: string | undefined, a: InputJson, b: InputJson): ToolboxItem =>
   blk(type, { ...(op ? { fields: { OP: op } } : {}), inputs: { A: a, B: b } });
 
-/** Static categories; Variables and Functions are filled per workspace from ToolboxInfo. */
-export function toolbox() {
+/**
+ * Core categories plus one per extension in `catalog`. Variables and Functions are filled per
+ * workspace from ToolboxInfo.
+ */
+export function toolbox(catalog: Catalog = CORE_CATALOG) {
   const cat = (name: string, style: string, contents: ToolboxItem[]) => ({
     kind: 'category',
     name,
@@ -68,6 +90,7 @@ export function toolbox() {
         blk('stitch_on_start'),
         blk('stitch_on_key'),
         blk('stitch_on_message'),
+        blk('stitch_on_click'),
         ...byCategory('events'),
       ]),
       cat('Motion', 'motion_category', [
@@ -92,6 +115,7 @@ export function toolbox() {
         blk('stitch_prop', { fields: { PROP: 'size' } }),
         blk('stitch_prop', { fields: { PROP: 'costume_number' } }),
       ]),
+      cat('Sound', 'sound_category', byCategory('sound')),
       cat('Control', 'control_category', [
         builtin('wait'),
         blk('stitch_repeat', { inputs: { COUNT: num(10) } }),
@@ -103,9 +127,19 @@ export function toolbox() {
         blk('stitch_while'),
         blk('stitch_for', { inputs: { FROM: num(1), TO: num(10) } }),
         blk('stitch_for_step', { inputs: { FROM: num(10), TO: num(1), STEP: num(-1) } }),
+        blk('stitch_break'),
+        blk('stitch_continue'),
         builtin('stop'),
+        ...byCategory('control').filter(
+          (b) => !['stitch_b_wait', 'stitch_b_stop'].includes(b.type!),
+        ),
+        { kind: 'sep', gap: 24 },
+        blk('stitch_on_clone'),
+        ...byCategory('clones'),
       ]),
       cat('Sensing', 'sensing_category', byCategory('sensing')),
+      cat('Map', 'map_category', byCategory('map')),
+      cat('Pen', 'pen_category', byCategory('pen')),
       cat('Operators', 'operator_category', [
         binary('stitch_arith', '+', num(0), num(0)),
         binary('stitch_arith', '-', num(0), num(0)),
@@ -123,6 +157,7 @@ export function toolbox() {
         binary('stitch_join', undefined, str('apple '), str('banana')),
         blk('stitch_bool'),
         ...byCategory('math').filter((b) => b.type !== 'stitch_r_random'),
+        ...byCategory('strings'),
       ]),
       {
         kind: 'category',
@@ -146,7 +181,9 @@ export function toolbox() {
         categorystyle: 'procedure_category',
         custom: 'STITCH_FUNCTIONS',
       },
+      cat('Data', 'data_category', byCategory('data')),
       cat('Debug', 'debug_category', [...byCategory('debug'), blk('stitch_raw')]),
+      ...extensionCategories(catalog),
     ],
   };
 }
@@ -202,5 +239,6 @@ export function themeStyles() {
   }
   blockStyles.event_blocks!.hat = 'cap';
   blockStyles.procedure_blocks!.hat = 'cap';
+  blockStyles.control_hat_blocks!.hat = 'cap';
   return { blockStyles, categoryStyles };
 }

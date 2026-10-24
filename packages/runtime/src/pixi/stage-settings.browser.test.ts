@@ -11,7 +11,13 @@ afterEach(() => {
 });
 
 /** Renders one 10x10 red sprite at cart (x, y) and returns the red pixels' bounding box. */
-async function redBox(stage: StageSettings, x: number, y: number, pixelArt = false) {
+async function redBox(
+  stage: StageSettings,
+  x: number,
+  y: number,
+  pixelArt = false,
+  withMap = false,
+) {
   const el = document.createElement('div');
   el.style.cssText = `width:${stage.width}px;height:${stage.height}px;position:absolute;left:0;top:0`;
   document.body.appendChild(el);
@@ -31,23 +37,36 @@ async function redBox(stage: StageSettings, x: number, y: number, pixelArt = fal
     false,
   );
   r.setTextures(textures);
+  // As a tileset, the 10x10 red image is one 10px tile.
+  const map = withMap
+    ? {
+        tileset: 'red',
+        tileSize: 10,
+        width: 4,
+        height: 3,
+        cells: new Uint16Array([0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0]),
+      }
+    : undefined;
   const world = new World({
     stage: { ...stage, background: '#0000ff' },
-    sprites: [
-      {
-        id: 's',
-        name: 'S',
-        x,
-        y,
-        direction: 90,
-        size: 100,
-        visible: true,
-        layer: 0,
-        costumes: ['red'],
-        costume: 1,
-      },
-    ],
+    sprites: withMap
+      ? []
+      : [
+          {
+            id: 's',
+            name: 'S',
+            x,
+            y,
+            direction: 90,
+            size: 100,
+            visible: true,
+            layer: 0,
+            costumes: ['red'],
+            costume: 1,
+          },
+        ],
     costumes,
+    ...(map ? { map } : {}),
   });
   r.render(world);
 
@@ -111,6 +130,16 @@ describe('stage settings render in the right place', () => {
     const b = await redBox(normalizeStage({}), 10.4, -3.6, true);
     // centre 250.4 -> top-left 245.4 -> snapped to 245; y: 183.6 -> 178.6 -> 179
     expect(b).toMatchObject({ left: 245, right: 255, top: 179, bottom: 189 });
+  });
+
+  it('draws the tile map from the stage top-left, whatever the origin', async () => {
+    for (const stage of [
+      normalizeStage({}),
+      normalizeStage({ origin: 'top-left', yAxis: 'down' }),
+    ]) {
+      const b = await redBox(stage, 0, 0, true, true);
+      expect(b).toMatchObject({ left: 20, top: 10, right: 30, bottom: 20 });
+    }
   });
 
   it('clips sprites that are off-stage instead of drawing them in the letterbox', async () => {

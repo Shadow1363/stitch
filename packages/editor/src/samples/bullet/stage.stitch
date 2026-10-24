@@ -1,0 +1,98 @@
+-- Needle Storm: a bullet hell against one boss, The Spool.
+-- Arrow keys or WASD to fly, Z or Space to shoot, hold Shift or X to fly slowly and precisely.
+-- Only the red dot in the middle of your thimble can be hit. You have three lives.
+-- The Stage holds the game's state and draws the HUD; the Boss fires bullet patterns, which the
+-- Bullet sprite turns into clones.
+-- "play" while the fight is on, "break" between the boss's phases, "over" or "won" at the end.
+global var state = "play"
+global var lives = 3
+-- Ticks left of being safe after a hit, so one mistake costs one life.
+global var safe = 0
+-- Where the player's hit dot is, for every bullet to check.
+global var px = 96
+global var py = 220
+-- The boss's health, the phase it's in (1 to 3), and its name for each phase.
+global var boss_hp = 600
+global var boss_max = 600
+global var phase = 1
+global var phase_names = ["SPIRAL", "RINGS AND NEEDLES", "PETAL STORM"]
+-- Bullets the boss wants fired, waiting for the Bullet sprite: lists of
+-- [x, y, heading, speed, kind, spin].
+global var queue = []
+-- When the fight started, for the time on the win screen.
+global var started = 0
+
+on start do
+  new_game()
+end
+
+on message "restart" do
+  broadcast_wait("clear bullets")
+  new_game()
+end
+
+function new_game()
+  lives = 3
+  safe = 0
+  boss_hp = boss_max
+  phase = 1
+  queue = []
+  started = frame_count()
+  state = "play"
+  play_music("storm")
+  broadcast("begin")
+end
+
+on key "r" do
+  if state == "over" or state == "won" then
+    broadcast("restart")
+  end
+end
+
+-- The HUD, redrawn every tick: the boss's health bar on top, lives and phase at the bottom.
+on start do
+  forever do
+    draw_hud()
+  end
+end
+
+warp function draw_hud()
+  clear_pen()
+  set_pen_size(1)
+  set_pen_color(3)
+  fill_rect(8, 4, 184, 8)
+  set_pen_color(9)
+  fill_rect(8, 4, 8 + 176 * max(0, boss_hp) / boss_max, 8)
+  set_pen_color(8)
+  draw_text("THE SPOOL", 8, 11)
+  draw_text("LIVES " .. lives, 8, 248)
+  draw_text(phase .. ". " .. phase_names[phase], 184 - len(phase .. ". " .. phase_names[phase]) * 4, 248)
+  if state == "break" then
+    centered("PHASE " .. phase, 110, 2)
+    centered(phase_names[phase], 126, 1)
+  elseif state == "over" then
+    panel("GAME OVER", 9)
+    centered("THE SPOOL WAS AT " .. round(100 * boss_hp / boss_max) .. "%", 128, 1)
+    centered("PRESS R TO TRY AGAIN", 140, 1)
+  elseif state == "won" then
+    panel("YOU WIN!", 12)
+    centered("WITH " .. lives .. " LIVES LEFT IN " .. round((frame_count() - started) / 60) .. " SECONDS", 128, 1)
+    centered("PRESS R TO PLAY AGAIN", 140, 1)
+  end
+end
+
+-- A box across the middle of the stage with a big title in colour c.
+function panel(title, c)
+  set_pen_color(1)
+  fill_rect(8, 96, 184, 152)
+  set_pen_color(c)
+  centered(title, 104, 3)
+  set_pen_color(8)
+end
+
+-- Writes text centred across the stage. The pixel font is 4 pixels a letter.
+function centered(text, top, scale)
+  set_pen_size(scale)
+  draw_text(text, 96 - len(text) * 2 * scale, top)
+  set_pen_size(1)
+end

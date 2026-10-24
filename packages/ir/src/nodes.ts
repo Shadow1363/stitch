@@ -1,6 +1,6 @@
 import type { SpriteProp } from './props';
 
-export const IR_VERSION = 1 as const;
+export const IR_VERSION = 2 as const;
 
 /** Unique within a project. Ignored by `irEqual`; reassigned on every parse. */
 export type NodeId = string;
@@ -43,7 +43,11 @@ export type TopItem = VarDecl | FunctionDef | EventScript | Raw;
 
 export interface VarDecl extends Base {
   kind: 'VarDecl';
-  scope: 'sprite' | 'global';
+  /**
+   * sprite: one per sprite, and each clone gets its own copy (Scratch "for this sprite only").
+   * shared: one value for a sprite and all its clones. global: one value for the whole cart.
+   */
+  scope: 'sprite' | 'shared' | 'global';
   name: string;
   init: Expr;
 }
@@ -64,7 +68,13 @@ export interface EventScript extends Base {
 }
 
 export type EventSpec =
-  { type: 'start' } | { type: 'key'; key: string } | { type: 'message'; name: string };
+  | { type: 'start' }
+  | { type: 'key'; key: string }
+  | { type: 'message'; name: string }
+  /** A clone of this sprite has just been made; runs in the clone. */
+  | { type: 'clone' }
+  /** The sprite was clicked on stage. */
+  | { type: 'click' };
 
 export interface Block {
   stmts: Stmt[];
@@ -83,6 +93,8 @@ export type Stmt =
   | ForEach
   | WaitUntil
   | Return
+  | Break
+  | Continue
   | CallStmt
   | Raw;
 
@@ -163,6 +175,16 @@ export interface WaitUntil extends Base {
 export interface Return extends Base {
   kind: 'Return';
   value?: Expr;
+}
+
+/** Leaves the innermost loop. Like `return`, it must end its block. */
+export interface Break extends Base {
+  kind: 'Break';
+}
+
+/** Skips to the next iteration of the innermost loop (which still waits a tick). */
+export interface Continue extends Base {
+  kind: 'Continue';
 }
 
 export interface CallStmt extends Base {

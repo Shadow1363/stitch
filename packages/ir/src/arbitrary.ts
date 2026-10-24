@@ -89,8 +89,13 @@ export const exprArb: fc.Arbitrary<Expr> = fc
   }))
   .e.filter(validNegation);
 
+/** Statements that may only end a block. */
+const capArb = fc.option(fc.constantFrom('Break', 'Continue' as const), { nil: undefined });
+
 export const stmtArb: fc.Arbitrary<Stmt> = fc.letrec<{ s: Stmt }>((tie) => {
-  const body = fc.array(tie('s'), { maxLength: 3 }).map((stmts) => ({ stmts }));
+  const body = fc
+    .tuple(fc.array(tie('s'), { maxLength: 3 }), capArb)
+    .map(([stmts, cap]) => ({ stmts: cap ? [...stmts, { id: id(), kind: cap } as Stmt] : stmts }));
   return {
     s: fc.oneof(
       { depthSize: 'small' },
@@ -186,7 +191,7 @@ const bodyWithReturn = fc
 
 export const topItemArb: fc.Arbitrary<TopItem> = fc.oneof(
   fc
-    .tuple(fc.constantFrom('sprite', 'global' as const), name, exprArb, comments)
+    .tuple(fc.constantFrom('sprite', 'shared', 'global' as const), name, exprArb, comments)
     .map(([scope, n, init, c]): TopItem => ({
       id: id(),
       kind: 'VarDecl',
@@ -206,6 +211,8 @@ export const topItemArb: fc.Arbitrary<TopItem> = fc.oneof(
     .tuple(
       fc.oneof(
         fc.constant({ type: 'start' as const }),
+        fc.constant({ type: 'clone' as const }),
+        fc.constant({ type: 'click' as const }),
         fc.constantFrom('space', 'left', 'a').map((key) => ({ type: 'key' as const, key })),
         fc.string({ maxLength: 5 }).map((n) => ({ type: 'message' as const, name: n })),
       ),

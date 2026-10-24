@@ -4,6 +4,7 @@ var vy = 2
 
 on start do
   goto(0, 0)
+  play_music("theme")
   say_for("Use the arrow keys!", 2)
 end
 
@@ -30,6 +31,9 @@ on start do
     if edge == "top" or edge == "bottom" then
       vy = -vy
     end
+    if edge ~= "" then
+      play_sound("bounce")
+    end
     clamp_to_stage()
   end
 end
@@ -37,5 +41,6 @@ end
 on key "space" do
   vx = 0
   vy = 0
+  play_sound("stop")
   say_for("Stop!", 1)
 end

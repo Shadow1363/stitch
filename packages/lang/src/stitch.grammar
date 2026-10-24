@@ -17,7 +17,7 @@
 
 item { VarDecl | FunctionDef | EventScript }
 
-VarDecl { kw<"global">? kw<"var"> Name "=" expr }
+VarDecl { (kw<"global"> | ckw<"shared">)? kw<"var"> Name "=" expr }
 
 // `warp` runs the function without yielding at loop ends (Scratch "run without screen refresh").
 FunctionDef { ckw<"warp">? kw<"function"> Name ParamList Body kw<"end"> }
@@ -26,13 +26,16 @@ ParamList { "(" commaSep<Name> ")" }
 
 EventScript { kw<"on"> event kw<"do"> Body kw<"end"> }
 
-event { StartEvent | KeyEvent | MessageEvent }
+event { StartEvent | KeyEvent | MessageEvent | CloneEvent | ClickEvent }
 StartEvent { ckw<"start"> }
+CloneEvent { ckw<"clone"> }
+ClickEvent { ckw<"click"> }
 KeyEvent { ckw<"key"> String }
 MessageEvent { ckw<"message"> String }
 
-// `return` may only end a block (as in Lua), which keeps `return` + newline unambiguous.
-Body { statement* Return? }
+// `return`, `break` and `continue` may only end a block (as in Lua), which keeps `return` +
+// newline unambiguous and gives each its cap block.
+Body { statement* (Return | Break | Continue)? }
 
 statement {
   LocalDecl | Assign | CallStmt | If | Forever | Repeat | RepeatUntil |
@@ -69,6 +72,10 @@ ForEach { kw<"for"> Name kw<"in"> expr kw<"do"> Body kw<"end"> }
 WaitUntil { ckw<"wait"> kw<"until"> expr }
 
 Return { kw<"return"> expr? }
+
+Break { kw<"break"> }
+
+Continue { kw<"continue"> }
 
 expr {
   Number | String | Boolean | ListLit | Name | CallExpr | IndexExpr |

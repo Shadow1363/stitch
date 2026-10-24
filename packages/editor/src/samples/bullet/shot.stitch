@@ -1,0 +1,38 @@
+-- The player's shots: while fire is held, the hidden original puts a pair of clones at the
+-- thimble every 5 ticks. Each flies up until it hits the boss or leaves the stage.
+on start do
+  hide()
+  forever do
+    if firing and state == "play" and frame_count() % 5 == 0 then
+      goto(px - 4, py - 8)
+      create_clone()
+      goto(px + 4, py - 8)
+      create_clone()
+      if frame_count() % 10 == 0 then
+        play_sound("shot")
+      end
+    end
+  end
+end
+
+on clone do
+  show()
+  forever do
+    y -= 7
+    if y < -8 then
+      delete_clone()
+    end
+    if touching("Boss") then
+      if state == "play" then
+        boss_hp -= 1
+      end
+      delete_clone()
+    end
+  end
+end
+
+on message "clear bullets" do
+  if is_clone() then
+    delete_clone()
+  end
+end

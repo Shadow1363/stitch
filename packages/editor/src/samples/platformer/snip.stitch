@@ -1,0 +1,72 @@
+-- Snips: walking scissors. The hidden original makes one clone per "e" in the level. Each
+-- walks along its ledge and turns round at walls and edges. Land on one to stop it; touching
+-- it any other way costs a life.
+-- Which way this Snip walks: -1 left, 1 right.
+var dir = -1
+
+on start do
+  hide()
+  rotation_style("left-right")
+end
+
+on message "spawn" do
+  if not is_clone() then
+    spawn_all()
+  end
+end
+
+warp function spawn_all()
+  for s in snip_spots do
+    goto(s["x"], s["y"])
+    create_clone()
+  end
+end
+
+on clone do
+  dir = -1
+  point(-90)
+  show()
+  forever do
+    if state == "play" then
+      walk()
+      meet_patch()
+    end
+  end
+end
+
+function walk()
+  -- Turn at a wall or where the ground ends.
+  if solid(x + dir * 5, y) or not solid(x + dir * 5, y + 5) then
+    dir = -dir
+    point(90 * dir)
+  end
+  x += dir * 0.5
+  if frame_count() % 10 == 0 then
+    next_costume()
+  end
+end
+
+function meet_patch()
+  if touching("Player") then
+    -- Falling onto a Snip from above stops it; anything else hurts.
+    if var_of("Player", "vy") > 0 and y_of("Player") < y - 2 then
+      play_sound("stomp")
+      broadcast("stomp")
+      delete_clone()
+    else
+      broadcast("hurt")
+    end
+  end
+end
+
+-- Ground, earth and ledges (tiles 1 to 3) are solid.
+function solid(px, py)
+  local t = map_cell(floor(px / 8) + 1, floor(py / 8) + 1)
+  return t >= 1 and t <= 3
+end
+
+on message "clear" do
+  if is_clone() then
+    delete_clone()
+  end
+end

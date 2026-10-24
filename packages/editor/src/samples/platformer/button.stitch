@@ -1,0 +1,39 @@
+-- Buttons to collect: the hidden original makes one clone per "o" in the level.
+-- Where this button rests; it bobs up and down around it.
+var home = 0
+
+on start do
+  hide()
+end
+
+on message "spawn" do
+  if not is_clone() then
+    spawn_all()
+  end
+end
+
+warp function spawn_all()
+  for s in button_spots do
+    goto(s["x"], s["y"])
+    create_clone()
+  end
+end
+
+on clone do
+  home = y
+  show()
+  forever do
+    y = home + sin(frame_count() * 6 + x * 10) * 1.5
+    if touching("Player") then
+      play_sound("button")
+      broadcast("got button")
+      delete_clone()
+    end
+  end
+end
+
+on message "clear" do
+  if is_clone() then
+    delete_clone()
+  end
+end

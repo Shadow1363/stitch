@@ -1,0 +1,258 @@
+-- Patch Hop: a little platformer. Run and jump to the flag on each of the three levels,
+-- collecting buttons on the way. Jump on the scissors (Snips) to stop them; spikes and falls
+-- cost a life.
+-- The Stage holds the game's state, builds each level's tile map from text and draws the HUD.
+-- "busy" between levels, "play" while you can move, "over" after the last life, "won" at the end.
+global var state = "busy"
+global var level = 1
+global var lives = 3
+-- Buttons collected on finished levels, and on the level being played now.
+global var buttons = 0
+global var level_buttons = 0
+-- Where Patch starts this level, and where Snips and buttons go, as dictionaries with x and y.
+global var start_x = 0
+global var start_y = 0
+global var snip_spots = []
+global var button_spots = []
+
+-- The levels are at the end of this file: 32 by 20 cells of 8 pixels, a row of text per row:
+-- # ground, = a ledge, ^ spikes, F the flag above | its pole, P where Patch starts, o a button,
+-- e a Snip.
+-- Edit them to make your own levels.
+-- The levels in play order, filled in when the game starts.
+global var levels = []
+
+on start do
+  levels = [level1(), level2(), level3()]
+  new_game()
+end
+
+on message "restart" do
+  new_game()
+end
+
+function new_game()
+  level = 1
+  lives = 3
+  buttons = 0
+  reset_timer()
+  play_music("hop")
+  load_level()
+end
+
+-- Clears the old level, builds the new one and puts everyone in place.
+function load_level()
+  state = "busy"
+  level_buttons = 0
+  broadcast_wait("clear")
+  build_map(levels[level])
+  broadcast_wait("spawn")
+  state = "play"
+  draw_hud()
+end
+
+-- Turns a level's text into tile map cells. Ground is grass (tile 1) where it has sky above,
+-- and earth (tile 2) below that. Tiles 3 to 6 are the ledge, spikes, flag and pole.
+warp function build_map(rows)
+  snip_spots = []
+  button_spots = []
+  for row = 1, map_height() do
+    local line = rows[row]
+    for col = 1, map_width() do
+      local c = substring(line, col, col)
+      local tile = 0
+      if c == "#" then
+        tile = 1
+        if row > 1 and substring(rows[row - 1], col, col) == "#" then
+          tile = 2
+        end
+      elseif c == "=" then
+        tile = 3
+      elseif c == "^" then
+        tile = 4
+      elseif c == "F" then
+        tile = 5
+      elseif c == "|" then
+        tile = 6
+      elseif c == "P" then
+        start_x = col * 8 - 4
+        start_y = row * 8 - 4
+      elseif c == "o" then
+        push(button_spots, spot(col, row))
+      elseif c == "e" then
+        push(snip_spots, spot(col, row))
+      end
+      set_map_cell(col, row, tile)
+    end
+  end
+end
+
+-- The centre of a cell, as a dictionary with x and y.
+function spot(col, row)
+  local s = dict()
+  s["x"] = col * 8 - 4
+  s["y"] = row * 8 - 4
+  return s
+end
+
+-- ---- Messages from the sprites ----
+on message "got button" do
+  level_buttons += 1
+  draw_hud()
+end
+
+on message "level done" do
+  state = "busy"
+  buttons += level_buttons
+  play_sound("flag")
+  wait(1)
+  if level == len(levels) then
+    win()
+  else
+    level += 1
+    load_level()
+  end
+end
+
+on message "died" do
+  state = "busy"
+  lives -= 1
+  draw_hud()
+  wait(1)
+  if lives <= 0 then
+    game_over()
+  else
+    load_level()
+  end
+end
+
+on key "r" do
+  if state == "over" or state == "won" then
+    broadcast("restart")
+  end
+end
+
+-- ---- The HUD, drawn with the pen over the sky ----
+warp function draw_hud()
+  clear_pen()
+  set_pen_size(1)
+  set_pen_color(2)
+  fill_rect(0, 0, 255, 9)
+  set_pen_color(8)
+  draw_text("LEVEL " .. level .. "/" .. len(levels), 3, 2)
+  draw_text("LIVES " .. lives, 70, 2)
+  set_pen_color(11)
+  draw_text("BUTTONS " .. buttons + level_buttons, 130, 2)
+end
+
+function game_over()
+  state = "over"
+  stop_music()
+  play_sound("lose")
+  panel("GAME OVER", 9)
+  centered("YOU REACHED LEVEL " .. level, 76, 1)
+  centered("PRESS R TO TRY AGAIN", 88, 1)
+end
+
+function win()
+  state = "won"
+  stop_music()
+  play_sound("win")
+  panel("YOU DID IT!", 12)
+  centered("BUTTONS " .. buttons .. " IN " .. round(timer()) .. " SECONDS", 76, 1)
+  centered("PRESS R TO PLAY AGAIN", 88, 1)
+end
+
+-- A box in the middle of the stage with a big title in colour c.
+function panel(title, c)
+  set_pen_color(1)
+  fill_rect(40, 44, 216, 100)
+  set_pen_color(c)
+  centered(title, 52, 3)
+  set_pen_color(8)
+end
+
+-- Writes text centred across the stage. The pixel font is 4 pixels a letter.
+function centered(text, top, scale)
+  set_pen_size(scale)
+  draw_text(text, 128 - len(text) * 2 * scale, top)
+end
+
+-- ---- The levels ----
+-- Level 1. Hello, Patch: two pits and a Snip.
+function level1()
+  local rows = []
+  push(rows, "................................")
+  push(rows, "................................")
+  push(rows, "................................")
+  push(rows, "................................")
+  push(rows, "................................")
+  push(rows, "................................")
+  push(rows, "................................")
+  push(rows, "................................")
+  push(rows, "................................")
+  push(rows, "................................")
+  push(rows, "................................")
+  push(rows, "................................")
+  push(rows, "................................")
+  push(rows, ".......o.........o..............")
+  push(rows, "......===.......===.............")
+  push(rows, "....o..........................F")
+  push(rows, ".P.................e.......o...|")
+  push(rows, "##########...#########..########")
+  push(rows, "##########...#########..########")
+  push(rows, "##########^^^#########^^########")
+  return rows
+end
+
+-- Level 2. Steps: climb, cross and stomp.
+function level2()
+  local rows = []
+  push(rows, "................................")
+  push(rows, "................................")
+  push(rows, "................................")
+  push(rows, "................................")
+  push(rows, "................................")
+  push(rows, "................................")
+  push(rows, "................................")
+  push(rows, "................................")
+  push(rows, "................................")
+  push(rows, "................................")
+  push(rows, "....................o...........")
+  push(rows, "...................===..........")
+  push(rows, "................o...............")
+  push(rows, ".........o.......e.............F")
+  push(rows, "..............#####.....e.o....|")
+  push(rows, ".......#####..#####......#######")
+  push(rows, ".P.....#####..########...#######")
+  push(rows, "############..########...#######")
+  push(rows, "############..########...#######")
+  push(rows, "############^^########^^^#######")
+  return rows
+end
+
+-- Level 3. Pins and needles: pits, spikes and a button over a pit.
+function level3()
+  local rows = []
+  push(rows, "................................")
+  push(rows, "................................")
+  push(rows, "................................")
+  push(rows, "................................")
+  push(rows, "................................")
+  push(rows, "................................")
+  push(rows, "................................")
+  push(rows, "................................")
+  push(rows, "................................")
+  push(rows, "................................")
+  push(rows, "................................")
+  push(rows, "................................")
+  push(rows, "..................o.............")
+  push(rows, "................................")
+  push(rows, "..............###....o..........")
+  push(rows, ".........o....###...###........F")
+  push(rows, ".P......###...###...###.o^^e...|")
+  push(rows, "#####...###...###...############")
+  push(rows, "#####...###...###...############")
+  push(rows, "#####^^^###^^^###^^^############")
+  return rows
+end

@@ -1,0 +1,25 @@
+-- Stars drifting past, behind everything: clones of this sprite at random places and speeds.
+var speed = 1
+
+on start do
+  hide()
+  repeat 40 do
+    goto(random(0, stage_width()), random(0, stage_height()))
+    speed = random(0.3, 1.5)
+    create_clone()
+  end
+end
+
+on clone do
+  if speed > 1 then
+    costume("bright")
+  end
+  show()
+  forever do
+    y += speed
+    if y > stage_height() then
+      y = 0
+      x = random(0, stage_width())
+    end
+  end
+end

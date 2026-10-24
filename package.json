@@ -3,7 +3,9 @@
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.15.0",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "pnpm --filter @stitch/editor dev",
     "build": "pnpm --filter @stitch/editor build",
@@ -14,18 +16,23 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "gen": "pnpm --filter @stitch/lang gen",
-    "check:licenses": "node scripts/check-licenses.mjs"
+    "check:licenses": "node scripts/check-licenses.mjs",
+    "check:size": "pnpm --filter @stitch/export build",
+    "docs:blocks": "node packages/blocks/scripts/docs-blocks.ts",
+    "docs:reference": "node packages/blocks/scripts/docs-reference.ts",
+    "docs:api": "typedoc"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
-    "eslint": "^10.13.0",
-    "fast-check": "^4.10.2",
-    "prettier": "^3.9.10",
-    "typescript": "~6.0.3",
-    "typescript-eslint": "^8.72.0",
-    "vitest": "^5.0.5",
     "@vitest/browser": "^5.0.5",
     "@vitest/browser-playwright": "^5.0.5",
-    "playwright": "^1.64.1"
+    "eslint": "^10.13.0",
+    "fast-check": "^4.10.2",
+    "playwright": "^1.64.1",
+    "prettier": "^3.9.10",
+    "typedoc": "^0.28.20",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.72.0",
+    "vitest": "^5.0.5"
   }
 }

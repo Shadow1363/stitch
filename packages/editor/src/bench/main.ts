@@ -1,6 +1,7 @@
 /**
  * Benchmark: N sprites, each running real compiled Stitch through the scheduler, drawn by Pixi.
- *   /bench.html?n=1000&renderer=webgl|webgpu&sandbox=1&seconds=10
+ *   /bench.html?n=1000&renderer=webgl|webgpu&sandbox=1&seconds=10&clones=1
+ * clones=1: one sprite makes the other n - 1 balls with create_clone.
  * Pass bar (Phase 1): average >= 59 fps and p95 frame <= 18 ms at n=1000.
  */
 import { DEFAULT_STAGE, type SpriteInit } from '@stitch/cart';
@@ -18,15 +19,11 @@ const N = Number(q.get('n') ?? 1000);
 const pref = (q.get('renderer') ?? 'webgl') as RendererPreference;
 const sandbox = q.get('sandbox') === '1';
 const seconds = Number(q.get('seconds') ?? 10);
+const clones = q.get('clones') === '1';
 const hud = document.getElementById('hud')!;
 const host = document.getElementById('stage')!;
 
-const BALL = `var vx = random(-4, 4) + 0.5
-var vy = random(-4, 4) + 0.5
-
-on start do
-  goto(random(-200, 200), random(-150, 150))
-  forever do
+const BALL_LOOP = `  forever do
     x += vx
     y += vy
     turn(3)
@@ -39,7 +36,31 @@ on start do
     end
     clamp_to_stage()
   end
+`;
+
+const BALL = `var vx = random(-4, 4) + 0.5
+var vy = random(-4, 4) + 0.5
+
+on start do
+  goto(random(-200, 200), random(-150, 150))
+${BALL_LOOP}end
+`;
+
+/** One sprite that clones itself; each clone picks its own speed and place. */
+const CLONING_BALL = `var vx = 0
+var vy = 0
+
+on start do
+  repeat ${N - 1} do
+    create_clone()
+  end
 end
+
+on clone do
+  vx = random(-4, 4) + 0.5
+  vy = random(-4, 4) + 0.5
+  goto(random(-200, 200), random(-150, 150))
+${BALL_LOOP}end
 `;
 
 async function ballImage(): Promise<CostumeImage> {
@@ -61,8 +82,8 @@ async function ballImage(): Promise<CostumeImage> {
 }
 
 function program() {
-  const module = parse(BALL).module;
-  const sprites: SpriteInit[] = Array.from({ length: N }, (_, i) => ({
+  const module = parse(clones ? CLONING_BALL : BALL).module;
+  const sprites: SpriteInit[] = Array.from({ length: clones ? 1 : N }, (_, i) => ({
     id: `b${i}`,
     name: `Ball${i}`,
     x: 0,
@@ -101,7 +122,7 @@ function report(samples: Sample[], p95: number | undefined, renderer: string, do
   const render = mean((s) => s.renderMs);
   const pass = avg >= 59 && (p95 === undefined || p95 <= 18);
   hud.textContent = [
-    `sprites   ${N}${sandbox ? '  (sandboxed iframe)' : ''}`,
+    `sprites   ${N}${clones ? ' (clones)' : ''}${sandbox ? '  (sandboxed iframe)' : ''}`,
     `renderer  ${renderer}`,
     `fps       ${last ? last.fps.toFixed(1) : '…'}   avg ${avg.toFixed(1)}`,
     p95 !== undefined ? `p95 frame ${p95.toFixed(2)} ms` : `p95 frame n/a in sandbox mode`,
@@ -116,6 +137,7 @@ function report(samples: Sample[], p95: number | undefined, renderer: string, do
       n: N,
       renderer,
       sandbox,
+      clones,
       avgFps: +avg.toFixed(2),
       p95: p95 === undefined ? null : +p95.toFixed(2),
       tickMs: +tick.toFixed(3),
@@ -133,7 +155,7 @@ async function inPage() {
   const { textures, costumes } = texturesFromCostumes([await ballImage()], false);
   renderer.setTextures(textures);
   const world = new World({
-    stage: { ...DEFAULT_STAGE, background: '#1d2330' },
+    stage: { ...DEFAULT_STAGE, background: '#1d2330', cloneLimit: N },
     sprites,
     costumes,
     seed: 1234,
@@ -178,9 +200,12 @@ async function inSandbox() {
         renderer = m.renderer as RendererPreference;
         client.load({
           code,
-          stage: { ...DEFAULT_STAGE, background: '#1d2330' },
+          stage: { ...DEFAULT_STAGE, background: '#1d2330', cloneLimit: N },
           sprites,
           costumes: [await ballImage()],
+          sounds: [],
+          songs: [],
+          extensions: [],
         });
         client.run();
         started = performance.now();

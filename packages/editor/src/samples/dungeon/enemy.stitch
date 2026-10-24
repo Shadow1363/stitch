@@ -1,0 +1,164 @@
+-- Enemies: the hidden original makes one clone per enemy on the floor. Each clone keeps its
+-- own kind, cell and hit points, and takes a turn whenever the player has taken one.
+-- Kinds: 1 rat, 2 slime, 3 skeleton. Costume number is the kind.
+var names = ["RAT", "SLIME", "SKELETON"]
+var hit_points = [2, 4, 6]
+var strength = [1, 1, 2]
+var sight = [5, 4, 7]
+
+-- This clone's kind, cell and hit points.
+var kind = 1
+var cx = 0
+var cy = 0
+var hp = 0
+-- Slimes are slow: they rest every other turn.
+var resting = false
+-- How many enemies are alive on this floor, shared by the whole family.
+shared var alive = 0
+
+on start do
+  hide()
+  rotation_style("left-right")
+end
+
+-- The original makes the clones. Each copy starts with the kind and cell set just before.
+on message "spawn" do
+  if not is_clone() then
+    spawn_all()
+  end
+end
+
+warp function spawn_all()
+  for spot in enemy_spots do
+    kind = spot["kind"]
+    cx = spot["x"]
+    cy = spot["y"]
+    create_clone()
+  end
+end
+
+on clone do
+  costume(kind)
+  hp = hit_points[kind]
+  alive += 1
+  set_cell(occ, cx, cy, my_id())
+  place()
+end
+
+-- Everything goes when a floor ends.
+on message "clear" do
+  if is_clone() then
+    delete_clone()
+  end
+  alive = 0
+end
+
+-- Only seen enemies are drawn.
+on message "look" do
+  if is_clone() then
+    if cell(visible, cx, cy) == 1 then
+      show()
+    else
+      hide()
+    end
+  end
+end
+
+on message "game over" do
+  hide()
+end
+
+-- The player bumped into one of us: only the clone with that id is hurt.
+on message "hit" do
+  if my_id() == target then
+    hp -= damage
+    push(messages, "YOU HIT THE " .. names[kind])
+    if hp <= 0 then
+      push(messages, "THE " .. names[kind] .. " IS DEFEATED")
+      set_cell(occ, cx, cy, "")
+      alive -= 1
+      delete_clone()
+    end
+    set_effect("brightness", 80)
+    wait(0.1)
+    clear_effects()
+  end
+end
+
+-- ---- Each enemy's turn ----
+on message "enemy turn" do
+  if is_clone() then
+    act()
+  end
+end
+
+-- Next to the player: attack. Can see the player: chase. Otherwise: wander.
+-- An enemy sees the player exactly when the player sees it, so we use the visible grid.
+warp function act()
+  if kind == 2 then
+    resting = not resting
+    if resting then
+      return
+    end
+  end
+  if abs(px - cx) + abs(py - cy) == 1 then
+    attack()
+  elseif cell(visible, cx, cy) == 1 and distance(cx, cy, px, py) <= sight[kind] then
+    chase()
+  elseif random_int(1, 10) <= 5 then
+    wander()
+  end
+end
+
+function attack()
+  health -= strength[kind]
+  push(messages, "THE " .. names[kind] .. " HITS YOU")
+  play_sound("hurt")
+  broadcast("ouch")
+end
+
+-- Steps along the longer distance to the player first, and tries the other way if blocked.
+function chase()
+  local dx = sign(px - cx)
+  local dy = sign(py - cy)
+  if abs(px - cx) >= abs(py - cy) then
+    if not step(dx, 0) then
+      step(0, dy)
+    end
+  else
+    if not step(0, dy) then
+      step(dx, 0)
+    end
+  end
+end
+
+function wander()
+  local dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]]
+  local d = dirs[random_int(1, 4)]
+  step(d[1], d[2])
+end
+
+-- Moves one cell if it's floor, free and not the player's. True if it moved.
+function step(dx, dy)
+  local nx = cx + dx
+  local ny = cy + dy
+  if dx == 0 and dy == 0 or cell(level, nx, ny) == 1 or cell(occ, nx, ny) ~= "" then
+    return false
+  end
+  if nx == px and ny == py or cell(loot, nx, ny) ~= "" then
+    return false
+  end
+  set_cell(occ, cx, cy, "")
+  cx = nx
+  cy = ny
+  set_cell(occ, cx, cy, my_id())
+  if dx ~= 0 then
+    point(90 * dx)
+  end
+  place()
+  return true
+end
+
+function place()
+  goto(cx * 8 - 4, cy * 8 - 4)
+end

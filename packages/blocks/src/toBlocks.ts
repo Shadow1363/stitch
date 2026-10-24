@@ -1,5 +1,6 @@
 import {
-  getBuiltin,
+  CORE_CATALOG,
+  type Catalog,
   type Block,
   type Expr,
   type Module,
@@ -15,17 +16,33 @@ import { blockTypeOf } from './labels';
 /** Slot kinds decide which shadow (typed-in default) an input gets. */
 type Slot = ValueType;
 
-/** IR module -> Blockly top-level blocks. Block ids are IR node ids. */
-export function toBlocks(m: Module, layout: Record<string, Position> = {}): BlockJson[] {
-  return m.items.map((it) => {
-    const b = topItem(it);
-    const pos = layout[it.id];
-    if (pos) {
-      b.x = pos.x;
-      b.y = pos.y;
-    }
-    return b;
-  });
+/** Builtins for the conversion in progress; set for the duration of one synchronous call. */
+let catalog: Catalog = CORE_CATALOG;
+
+/**
+ * IR module -> Blockly top-level blocks. Block ids are IR node ids. Calls to `catalog` entries
+ * (core or extension) get their own blocks.
+ */
+export function toBlocks(
+  m: Module,
+  layout: Record<string, Position> = {},
+  cat: Catalog = CORE_CATALOG,
+): BlockJson[] {
+  const outer = catalog;
+  catalog = cat;
+  try {
+    return m.items.map((it) => {
+      const b = topItem(it);
+      const pos = layout[it.id];
+      if (pos) {
+        b.x = pos.x;
+        b.y = pos.y;
+      }
+      return b;
+    });
+  } finally {
+    catalog = outer;
+  }
 }
 
 function withComment(b: BlockJson, t: Trivia | undefined): BlockJson {
@@ -67,11 +84,11 @@ function topItem(it: TopItem): BlockJson {
     case 'EventScript': {
       const ev = it.event;
       const head: BlockJson =
-        ev.type === 'start'
-          ? { type: 'stitch_on_start', id: it.id }
-          : ev.type === 'key'
-            ? { type: 'stitch_on_key', id: it.id, fields: { KEY: ev.key } }
-            : { type: 'stitch_on_message', id: it.id, fields: { MSG: ev.name } };
+        ev.type === 'key'
+          ? { type: 'stitch_on_key', id: it.id, fields: { KEY: ev.key } }
+          : ev.type === 'message'
+            ? { type: 'stitch_on_message', id: it.id, fields: { MSG: ev.name } }
+            : { type: `stitch_on_${ev.type}`, id: it.id };
       return withComment({ ...head, ...chainAsNext(it.body) }, it.trivia);
     }
     case 'Raw':
@@ -219,6 +236,10 @@ function stmtBlock(s: Stmt): BlockJson {
       return s.value
         ? { type: 'stitch_return_value', id, inputs: { VALUE: input(s.value, 'any') } }
         : { type: 'stitch_return', id };
+    case 'Break':
+      return { type: 'stitch_break', id };
+    case 'Continue':
+      return { type: 'stitch_continue', id };
     case 'Raw':
       return { type: 'stitch_raw', id, fields: { TEXT: s.text } };
   }
@@ -230,7 +251,7 @@ function callBlock(
   as: 'command' | 'reporter',
   id: string,
 ): BlockJson {
-  const b = getBuiltin(c.name);
+  const b = catalog.get(c.name);
   if (b && b.kind === as && b.params.length === c.args.length) {
     const ins: Record<string, InputJson> = {};
     c.args.forEach((a, i) => (ins[`ARG${i}`] = input(a, b.params[i]!.type)));

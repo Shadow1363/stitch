@@ -1,6 +1,6 @@
 <script lang="ts">
   import { StageClient } from '@stitch/runtime/bridge';
-  import type { FromStage, LoadPayload } from '@stitch/runtime/protocol';
+  import type { FromStage, HttpResponse, LoadPayload } from '@stitch/runtime/protocol';
   import { onMount } from 'svelte';
 
   interface Props {
@@ -29,16 +29,24 @@
   export function stop() {
     client?.stop();
   }
+  export function pause(paused: boolean) {
+    client?.pause(paused);
+  }
+  export function httpResult(id: number, res: HttpResponse) {
+    client?.httpResult(id, res);
+  }
 </script>
 
 <div class="stage" bind:this={host}></div>
 
 <style>
   .stage {
+    /* Fills its pane; the renderer letterboxes the cart's stage inside. */
     width: 100%;
-    aspect-ratio: 4 / 3;
-    background: #111;
-    border-radius: 8px;
+    flex: 1;
+    min-height: 0;
+    background: var(--letterbox);
+    border-radius: var(--radius-l);
     overflow: hidden;
   }
 </style>

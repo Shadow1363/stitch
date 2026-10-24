@@ -9,7 +9,10 @@
     "./host": "./src/host.ts",
     "./bridge": "./src/bridge.ts",
     "./protocol": "./src/protocol.ts",
-    "./stats": "./src/stats.ts"
+    "./stats": "./src/stats.ts",
+    "./fetch-net": "./src/web/fetch-net.ts",
+    "./runner": "./src/runner.ts",
+    "./extensions": "./src/core/extensions.ts"
   },
   "dependencies": {
     "@stitch/cart": "workspace:*",

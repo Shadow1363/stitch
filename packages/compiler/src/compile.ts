@@ -1,4 +1,12 @@
-import { validateProject, type Diagnostic, type NodeId, type Project } from '@stitch/ir';
+import {
+  CORE_CATALOG,
+  validateProject,
+  type CartNames,
+  type Catalog,
+  type Diagnostic,
+  type NodeId,
+  type Project,
+} from '@stitch/ir';
 import { emitProject } from './emit';
 
 export interface CompileResult {
@@ -11,11 +19,17 @@ export interface CompileResult {
 
 /**
  * Validates and compiles a project. `spriteOrder` is the cart's sprite order, which decides
- * script order at runtime; it defaults to the project order.
+ * script order at runtime; it defaults to the project order. `catalog` adds the cart's extensions,
+ * and `names` (the cart's sprites, costumes, sounds and songs) turns on the cart-name warnings.
  */
-export function compile(project: Project, spriteOrder?: string[]): CompileResult {
-  const diagnostics = validateProject(project);
-  const emitted = emitProject(project, spriteOrder);
+export function compile(
+  project: Project,
+  spriteOrder?: string[],
+  catalog: Catalog = CORE_CATALOG,
+  names?: CartNames,
+): CompileResult {
+  const diagnostics = validateProject(project, catalog, names);
+  const emitted = emitProject(project, spriteOrder, catalog);
   const all = [...diagnostics, ...emitted.diagnostics];
   const ok = !all.some((d) => d.severity === 'error');
   return { code: ok ? emitted.code : '', lineMap: ok ? emitted.lineMap : [], diagnostics: all, ok };

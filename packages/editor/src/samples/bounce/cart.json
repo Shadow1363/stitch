@@ -1,19 +1,830 @@
 {
-  "format": "stitch-cart",
-  "version": 1,
-  "meta": { "title": "Bounce" },
+  "meta": {
+    "title": "Bounce"
+  },
   "stage": {
     "width": 480,
     "height": 360,
     "origin": "center",
     "yAxis": "up",
-    "scaling": { "mode": "fit", "filter": "smooth" },
+    "scaling": {
+      "mode": "fit",
+      "filter": "smooth"
+    },
     "background": "#f4f1ea"
   },
   "sprites": [
-    { "id": "player", "name": "Player", "x": 0, "y": 0, "direction": 90, "size": 200, "visible": true, "layer": 0, "costumes": ["player"], "costume": 1 }
+    {
+      "id": "player",
+      "name": "Player",
+      "x": 0,
+      "y": 0,
+      "direction": 90,
+      "size": 200,
+      "visible": true,
+      "layer": 0,
+      "costumes": [
+        "player"
+      ],
+      "costume": 1
+    }
+  ],
+  "palette": [
+    "#000000",
+    "#1d2b53",
+    "#7e2553",
+    "#008751",
+    "#ab5236",
+    "#5f574f",
+    "#c2c3c7",
+    "#fff1e8",
+    "#ff004d",
+    "#ffa300",
+    "#ffec27",
+    "#00e436",
+    "#29adff",
+    "#83769c",
+    "#ff77a8",
+    "#ffccaa"
   ],
   "assets": {
-    "player": { "type": "image/png", "data": "/samples/player.png", "pixelArt": true, "center": [16, 16], "name": "player" }
+    "player": {
+      "kind": "png",
+      "data": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAuUlEQVR4nO2XSw6AIAxEPYRr16w9k4fwEN4ZE2PiJ7RQmLbE2KQbNvNoCwzD8Icw1nmMXJoJxy08Ug2EE6USBiIVpkBcxJsgUOJVEGhxMYSG+B1CZ/fvINayVajefSEAW4Wm3p8xTeFIco2rQhcA1QMmACDbgAAomQEdAMRx7AJABLGsVwrF8acgIcKJs3cBsswpE5O9CbXfgqL3wHT4rKrg6glcXZGrL4Q6YxdbToGYfkxyIGbCn40dEXsmIIBCP6UAAAAASUVORK5CYII=",
+      "pixelArt": true,
+      "center": [
+        16,
+        16
+      ],
+      "name": "player"
+    }
+  },
+  "sounds": {
+    "bounce": {
+      "kind": "sfx",
+      "name": "bounce",
+      "params": {
+        "wave": "square",
+        "attack": 0,
+        "sustain": 0.08,
+        "punch": 0,
+        "decay": 0.16,
+        "freq": 0.42,
+        "freqLimit": 0,
+        "slide": 0.22,
+        "deltaSlide": 0,
+        "vibDepth": 0,
+        "vibSpeed": 0,
+        "arpMod": 0,
+        "arpSpeed": 0,
+        "duty": 0.35,
+        "dutySweep": 0,
+        "repeatSpeed": 0,
+        "phaserOffset": 0,
+        "phaserSweep": 0,
+        "lpCutoff": 1,
+        "lpCutoffSweep": 0,
+        "lpResonance": 0,
+        "hpCutoff": 0.1,
+        "hpCutoffSweep": 0,
+        "volume": 0.4
+      }
+    },
+    "stop": {
+      "kind": "sfx",
+      "name": "stop",
+      "params": {
+        "wave": "noise",
+        "attack": 0,
+        "sustain": 0.05,
+        "punch": 0.4,
+        "decay": 0.25,
+        "freq": 0.3,
+        "freqLimit": 0,
+        "slide": -0.35,
+        "deltaSlide": 0,
+        "vibDepth": 0,
+        "vibSpeed": 0,
+        "arpMod": 0,
+        "arpSpeed": 0,
+        "duty": 0,
+        "dutySweep": 0,
+        "repeatSpeed": 0,
+        "phaserOffset": 0,
+        "phaserSweep": 0,
+        "lpCutoff": 1,
+        "lpCutoffSweep": 0,
+        "lpResonance": 0,
+        "hpCutoff": 0,
+        "hpCutoffSweep": 0,
+        "volume": 0.4
+      }
+    }
+  },
+  "music": {
+    "channels": 4,
+    "instruments": {
+      "i1": {
+        "name": "Lead",
+        "wave": "pulse",
+        "attack": 0.005,
+        "decay": 0.12,
+        "sustain": 0.5,
+        "release": 0.08,
+        "volume": 0.6
+      },
+      "i2": {
+        "name": "Bass",
+        "wave": "triangle",
+        "attack": 0.005,
+        "decay": 0.1,
+        "sustain": 0.7,
+        "release": 0.05,
+        "volume": 0.9
+      },
+      "i3": {
+        "name": "Pad",
+        "wave": "saw",
+        "attack": 0.08,
+        "decay": 0.15,
+        "sustain": 0.6,
+        "release": 0.3,
+        "volume": 0.4
+      },
+      "i4": {
+        "name": "Drum",
+        "wave": "noise",
+        "attack": 0.001,
+        "decay": 0.06,
+        "sustain": 0,
+        "release": 0.02,
+        "volume": 0.7
+      }
+    },
+    "patterns": {
+      "pattern1": {
+        "name": "Verse",
+        "rows": 32,
+        "cells": [
+          [
+            {
+              "note": 72,
+              "inst": "i1",
+              "vol": 40
+            },
+            {
+              "note": 36,
+              "inst": "i2"
+            },
+            null,
+            {
+              "note": 48,
+              "inst": "i4",
+              "vol": 40
+            }
+          ],
+          [
+            null,
+            null,
+            null,
+            null
+          ],
+          [
+            {
+              "note": 76,
+              "inst": "i1",
+              "vol": 40
+            },
+            null,
+            null,
+            null
+          ],
+          [
+            null,
+            {
+              "note": 36,
+              "inst": "i2"
+            },
+            null,
+            null
+          ],
+          [
+            {
+              "note": 79,
+              "inst": "i1",
+              "vol": 40
+            },
+            null,
+            null,
+            {
+              "note": 72,
+              "inst": "i4",
+              "vol": 28
+            }
+          ],
+          [
+            null,
+            null,
+            null,
+            null
+          ],
+          [
+            {
+              "note": 76,
+              "inst": "i1",
+              "vol": 40
+            },
+            {
+              "note": 36,
+              "inst": "i2"
+            },
+            null,
+            null
+          ],
+          [
+            null,
+            null,
+            null,
+            null
+          ],
+          [
+            {
+              "note": 74,
+              "inst": "i1",
+              "vol": 40
+            },
+            {
+              "note": 41,
+              "inst": "i2"
+            },
+            null,
+            {
+              "note": 48,
+              "inst": "i4",
+              "vol": 40
+            }
+          ],
+          [
+            null,
+            null,
+            null,
+            null
+          ],
+          [
+            {
+              "note": 77,
+              "inst": "i1",
+              "vol": 40
+            },
+            null,
+            null,
+            null
+          ],
+          [
+            null,
+            {
+              "note": 41,
+              "inst": "i2"
+            },
+            null,
+            null
+          ],
+          [
+            {
+              "note": 81,
+              "inst": "i1",
+              "vol": 40
+            },
+            null,
+            null,
+            {
+              "note": 72,
+              "inst": "i4",
+              "vol": 28
+            }
+          ],
+          [
+            null,
+            null,
+            null,
+            null
+          ],
+          [
+            {
+              "note": -1
+            },
+            {
+              "note": 41,
+              "inst": "i2"
+            },
+            null,
+            null
+          ],
+          [
+            null,
+            null,
+            null,
+            null
+          ],
+          [
+            {
+              "note": 72,
+              "inst": "i1",
+              "vol": 40
+            },
+            {
+              "note": 43,
+              "inst": "i2"
+            },
+            null,
+            {
+              "note": 48,
+              "inst": "i4",
+              "vol": 40
+            }
+          ],
+          [
+            null,
+            null,
+            null,
+            null
+          ],
+          [
+            {
+              "note": 76,
+              "inst": "i1",
+              "vol": 40
+            },
+            null,
+            null,
+            null
+          ],
+          [
+            null,
+            {
+              "note": 43,
+              "inst": "i2"
+            },
+            null,
+            null
+          ],
+          [
+            {
+              "note": 79,
+              "inst": "i1",
+              "vol": 40
+            },
+            null,
+            null,
+            {
+              "note": 72,
+              "inst": "i4",
+              "vol": 28
+            }
+          ],
+          [
+            null,
+            null,
+            null,
+            null
+          ],
+          [
+            {
+              "note": 84,
+              "inst": "i1",
+              "vol": 40
+            },
+            {
+              "note": 43,
+              "inst": "i2"
+            },
+            null,
+            null
+          ],
+          [
+            null,
+            null,
+            null,
+            null
+          ],
+          [
+            {
+              "note": 83,
+              "inst": "i1",
+              "vol": 40
+            },
+            {
+              "note": 36,
+              "inst": "i2"
+            },
+            null,
+            {
+              "note": 48,
+              "inst": "i4",
+              "vol": 40
+            }
+          ],
+          [
+            null,
+            null,
+            null,
+            null
+          ],
+          [
+            {
+              "note": 79,
+              "inst": "i1",
+              "vol": 40
+            },
+            null,
+            null,
+            null
+          ],
+          [
+            null,
+            {
+              "note": 36,
+              "inst": "i2"
+            },
+            null,
+            null
+          ],
+          [
+            {
+              "note": 74,
+              "inst": "i1",
+              "vol": 40
+            },
+            null,
+            null,
+            {
+              "note": 72,
+              "inst": "i4",
+              "vol": 28
+            }
+          ],
+          [
+            null,
+            null,
+            null,
+            null
+          ],
+          [
+            {
+              "note": -1
+            },
+            {
+              "note": 36,
+              "inst": "i2"
+            },
+            null,
+            null
+          ],
+          [
+            null,
+            null,
+            null,
+            null
+          ]
+        ]
+      },
+      "pattern2": {
+        "name": "Turn",
+        "rows": 32,
+        "cells": [
+          [
+            {
+              "note": 76,
+              "inst": "i1",
+              "vol": 40
+            },
+            {
+              "note": 41,
+              "inst": "i2"
+            },
+            null,
+            {
+              "note": 48,
+              "inst": "i4",
+              "vol": 40
+            }
+          ],
+          [
+            null,
+            null,
+            null,
+            null
+          ],
+          [
+            {
+              "note": 79,
+              "inst": "i1",
+              "vol": 40
+            },
+            null,
+            null,
+            null
+          ],
+          [
+            null,
+            {
+              "note": 41,
+              "inst": "i2"
+            },
+            null,
+            null
+          ],
+          [
+            {
+              "note": 84,
+              "inst": "i1",
+              "vol": 40
+            },
+            null,
+            null,
+            {
+              "note": 72,
+              "inst": "i4",
+              "vol": 28
+            }
+          ],
+          [
+            null,
+            null,
+            null,
+            null
+          ],
+          [
+            {
+              "note": 79,
+              "inst": "i1",
+              "vol": 40
+            },
+            {
+              "note": 41,
+              "inst": "i2"
+            },
+            null,
+            null
+          ],
+          [
+            null,
+            null,
+            null,
+            null
+          ],
+          [
+            {
+              "note": 77,
+              "inst": "i1",
+              "vol": 40
+            },
+            {
+              "note": 43,
+              "inst": "i2"
+            },
+            null,
+            {
+              "note": 48,
+              "inst": "i4",
+              "vol": 40
+            }
+          ],
+          [
+            null,
+            null,
+            null,
+            null
+          ],
+          [
+            {
+              "note": 81,
+              "inst": "i1",
+              "vol": 40
+            },
+            null,
+            null,
+            null
+          ],
+          [
+            null,
+            {
+              "note": 43,
+              "inst": "i2"
+            },
+            null,
+            null
+          ],
+          [
+            {
+              "note": 84,
+              "inst": "i1",
+              "vol": 40
+            },
+            null,
+            null,
+            {
+              "note": 72,
+              "inst": "i4",
+              "vol": 28
+            }
+          ],
+          [
+            null,
+            null,
+            null,
+            null
+          ],
+          [
+            {
+              "note": -1
+            },
+            {
+              "note": 43,
+              "inst": "i2"
+            },
+            null,
+            null
+          ],
+          [
+            null,
+            null,
+            null,
+            null
+          ],
+          [
+            {
+              "note": 79,
+              "inst": "i1",
+              "vol": 40
+            },
+            {
+              "note": 36,
+              "inst": "i2"
+            },
+            null,
+            {
+              "note": 48,
+              "inst": "i4",
+              "vol": 40
+            }
+          ],
+          [
+            null,
+            null,
+            null,
+            null
+          ],
+          [
+            {
+              "note": 76,
+              "inst": "i1",
+              "vol": 40
+            },
+            null,
+            null,
+            null
+          ],
+          [
+            null,
+            {
+              "note": 36,
+              "inst": "i2"
+            },
+            null,
+            null
+          ],
+          [
+            {
+              "note": 72,
+              "inst": "i1",
+              "vol": 40
+            },
+            null,
+            null,
+            {
+              "note": 72,
+              "inst": "i4",
+              "vol": 28
+            }
+          ],
+          [
+            null,
+            null,
+            null,
+            null
+          ],
+          [
+            {
+              "note": 76,
+              "inst": "i1",
+              "vol": 40
+            },
+            {
+              "note": 36,
+              "inst": "i2"
+            },
+            null,
+            null
+          ],
+          [
+            null,
+            null,
+            null,
+            null
+          ],
+          [
+            {
+              "note": 74,
+              "inst": "i1",
+              "vol": 40
+            },
+            {
+              "note": 43,
+              "inst": "i2"
+            },
+            null,
+            {
+              "note": 48,
+              "inst": "i4",
+              "vol": 40
+            }
+          ],
+          [
+            null,
+            null,
+            null,
+            null
+          ],
+          [
+            {
+              "note": 71,
+              "inst": "i1",
+              "vol": 40
+            },
+            null,
+            null,
+            null
+          ],
+          [
+            null,
+            {
+              "note": 43,
+              "inst": "i2"
+            },
+            null,
+            null
+          ],
+          [
+            {
+              "note": 72,
+              "inst": "i1",
+              "vol": 40
+            },
+            null,
+            null,
+            {
+              "note": 72,
+              "inst": "i4",
+              "vol": 28
+            }
+          ],
+          [
+            null,
+            null,
+            null,
+            null
+          ],
+          [
+            {
+              "note": -1
+            },
+            {
+              "note": 43,
+              "inst": "i2"
+            },
+            null,
+            null
+          ],
+          [
+            null,
+            null,
+            null,
+            null
+          ]
+        ]
+      }
+    },
+    "songs": {
+      "song1": {
+        "name": "theme",
+        "bpm": 116,
+        "order": [
+          "pattern1",
+          "pattern2"
+        ],
+        "loop": true
+      }
+    }
   }
 }

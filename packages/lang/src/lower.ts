@@ -268,7 +268,7 @@ class Lowerer {
         return this.finish(n, {
           id: this.ids.next(),
           kind: 'VarDecl',
-          scope: n.getChild('global') ? 'global' : 'sprite',
+          scope: n.getChild('global') ? 'global' : n.getChild('shared') ? 'shared' : 'sprite',
           name,
           init,
         });
@@ -300,6 +300,8 @@ class Lowerer {
 
   private event(n: SyntaxNode): EventSpec {
     if (n.getChild('StartEvent')) return { type: 'start' };
+    if (n.getChild('CloneEvent')) return { type: 'clone' };
+    if (n.getChild('ClickEvent')) return { type: 'click' };
     const key = n.getChild('KeyEvent');
     if (key) return { type: 'key', key: this.str(key.getChild('String')!) };
     const msg = n.getChild('MessageEvent')!;
@@ -395,6 +397,10 @@ class Lowerer {
         const v = ex()[0];
         return this.finish(n, v ? { id, kind: 'Return', value: v } : { id, kind: 'Return' });
       }
+      case 'Break':
+        return this.finish(n, { id, kind: 'Break' });
+      case 'Continue':
+        return this.finish(n, { id, kind: 'Continue' });
     }
     throw new Error(`unexpected statement ${n.name}`);
   }

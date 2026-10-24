@@ -1,0 +1,148 @@
+-- The Spool: three phases of bullet patterns, changing at two thirds and one third of its
+-- health. Each phase is a function below; change the numbers to make it easier or harder.
+-- Ticks into the current phase.
+var t = 0
+-- Health at the last tick, to see when a shot hit.
+var last_hp = 0
+
+on start do
+  rotation_style("don't rotate")
+end
+
+on message "begin" do
+  goto(96, 56)
+  costume("calm")
+  clear_effects()
+  t = 0
+  show()
+end
+
+on start do
+  forever do
+    if state == "play" then
+      t += 1
+      attack()
+      drift()
+      check_health()
+    end
+    -- Flash white for a moment after each hit.
+    if boss_hp < last_hp then
+      set_effect("brightness", 60)
+    else
+      set_effect("brightness", 0)
+    end
+    last_hp = boss_hp
+  end
+end
+
+warp function attack()
+  if phase == 1 then
+    spiral()
+  elseif phase == 2 then
+    rings_and_needles()
+  else
+    petal_storm()
+  end
+end
+
+-- Phase 1: two arms of a turning spiral, and now and then three needles aimed at you.
+function spiral()
+  if t % 4 == 0 then
+    fire(t * 7, 1.5, 1, 0)
+    fire(t * 7 + 180, 1.5, 1, 0)
+  end
+  if t % 60 == 0 then
+    fan(aim(), 3, 15, 2.2, 2)
+  end
+end
+
+-- Phase 2: slow rings of big bullets, with fast fans of needles aimed at you between them.
+function rings_and_needles()
+  if t % 40 == 0 then
+    ring(20, t * 5, 1.2, 4)
+  end
+  if t % 18 == 0 then
+    fan(aim(), 5, 12, 2.6, 2)
+  end
+end
+
+-- Phase 3: petals that curl as they fly, in two arms turning opposite ways, and rings.
+function petal_storm()
+  if t % 5 == 0 then
+    fire(t * 11, 1.4, 3, 1.2)
+    fire(t * 11 + 180, 1.4, 3, -1.2)
+  end
+  if t % 80 == 0 then
+    ring(24, 0, 1, 1)
+  end
+end
+
+-- Asks for one bullet from the boss's centre.
+function fire(heading, speed, kind, spin)
+  push(queue, [x, y + 8, heading, speed, kind, spin])
+end
+
+-- n bullets evenly round a circle, starting at `from`.
+function ring(n, from, speed, kind)
+  for i = 1, n do
+    fire(from + 360 * i / n, speed, kind, 0)
+  end
+end
+
+-- n bullets fanned `gap` degrees apart, centred on `heading`.
+function fan(heading, n, gap, speed, kind)
+  for i = 1, n do
+    fire(heading + (i - (n + 1) / 2) * gap, speed, kind, 0)
+  end
+end
+
+-- The heading from the boss to the player.
+function aim()
+  return angle(x, y + 8, px, py)
+end
+
+-- Phase 1 sits still; phase 2 sways; phase 3 loops in a figure of eight.
+function drift()
+  if phase == 2 then
+    x = 96 + sin(t * 1.2) * 50
+  elseif phase == 3 then
+    x = 96 + sin(t * 1.5) * 56
+    y = 60 + sin(t * 3) * 16
+  end
+end
+
+function check_health()
+  if boss_hp <= 0 then
+    defeated()
+  elseif phase == 1 and boss_hp <= boss_max * 2 / 3 then
+    next_phase()
+  elseif phase == 2 and boss_hp <= boss_max / 3 then
+    next_phase()
+  end
+end
+
+-- A short break between phases: the bullets clear and the boss gets angrier.
+function next_phase()
+  state = "break"
+  phase += 1
+  costume("angry")
+  play_sound("phase")
+  broadcast("clear bullets")
+  glide(1.5, 96, 56)
+  t = 0
+  state = "play"
+end
+
+function defeated()
+  state = "won"
+  broadcast("clear bullets")
+  stop_music()
+  play_sound("boom")
+  repeat 30 do
+    x += random(-3, 3)
+    y += random(-3, 3)
+    change_effect("ghost", 3)
+  end
+  hide()
+  play_sound("win")
+end

@@ -1,0 +1,84 @@
+-- The player's thimble. It shoots by asking the Shot sprite to fire (see shot.stitch).
+-- Whether the fire button is held, for the Shot sprite.
+global var firing = false
+
+on start do
+  rotation_style("don't rotate")
+end
+
+on message "begin" do
+  goto(96, 220)
+  costume("ship")
+  clear_effects()
+  show()
+end
+
+on start do
+  forever do
+    if state == "play" or state == "break" then
+      fly()
+    else
+      firing = false
+    end
+  end
+end
+
+warp function fly()
+  -- Shift or X: slow and steady, with the hit dot shown.
+  local speed = 2.2
+  costume("ship")
+  if key_down("shift") or key_down("x") then
+    speed = 0.9
+    costume("focus")
+  end
+  local dx = 0
+  local dy = 0
+  if key_down("left") or key_down("a") then
+    dx -= 1
+  end
+  if key_down("right") or key_down("d") then
+    dx += 1
+  end
+  if key_down("up") or key_down("w") then
+    dy -= 1
+  end
+  if key_down("down") or key_down("s") then
+    dy += 1
+  end
+  -- Diagonals are no faster than straight lines.
+  if dx ~= 0 and dy ~= 0 then
+    speed = speed * 0.7071
+  end
+  x = clamp(x + dx * speed, 6, stage_width() - 6)
+  y = clamp(y + dy * speed, 20, stage_height() - 14)
+  px = x
+  py = y
+  firing = key_down("z") or key_down("space")
+  -- Blink while safe after a hit.
+  if safe > 0 then
+    safe -= 1
+    if safe % 8 < 4 then
+      set_effect("ghost", 70)
+    else
+      set_effect("ghost", 0)
+    end
+  else
+    set_effect("ghost", 0)
+  end
+end
+
+-- A bullet reached the hit dot.
+on message "player hit" do
+  if state == "play" and safe == 0 then
+    lives -= 1
+    safe = 120
+    play_sound("ouch")
+    broadcast("clear bullets")
+    if lives <= 0 then
+      state = "over"
+      stop_music()
+      play_sound("boom")
+      hide()
+    end
+  end
+end

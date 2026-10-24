@@ -1,27 +1,186 @@
+/*
+ * Design tokens: the single source of colours, fonts, spacing and radii (CLAUDE.md, Styling).
+ * Light values sit on :root and dark ones on [data-theme='dark'], which lib/theme.ts sets
+ * (index.html sets it before first paint, so there is no flash). Components use var(--…) only;
+ * tokens.test.ts checks WCAG AA contrast for every pairing below and bans colour literals
+ * elsewhere. Canvas code reads tokens with token() from lib/theme.ts.
+ */
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/inter/700.css';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/700.css';
+
 :root {
-  --text: #1d1d1f;
-  --muted: #6e6e73;
+  /* Brand: the logo blue, the same in both themes. */
+  --brand: #1f5be1;
+  --brand-ink: #ffffff;
+
+  /* Surfaces and text */
+  --chrome: #f3f4f7;
   --panel: #ffffff;
-  --chrome: #f3f2ef;
-  --line: #e2e0db;
-  --accent: #2f6fdb;
-  --go: #2e9d4f;
-  --bad: #c62f2f;
-  color-scheme: light dark;
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --well: #e9ecf2;
+  --line: #dfe3ea;
+  --line-strong: #848da0;
+  --text: #151922;
+  --muted: #586172;
+
+  /* Actions and states */
+  --accent: #1f5be1;
+  --on-accent: #ffffff;
+  --link: #1f5be1;
+  --focus: #1f5be1;
+  --go: #1b7a3a;
+  --on-go: #ffffff;
+  --bad: #b3232a;
+  --on-bad: #ffffff;
+  --warn: #8a5300;
+
+  /* Supporting colours (sound editors, tracker effect columns) */
+  --violet: #6a3dd0;
+  --on-violet: #ffffff;
+  --teal: #0b6e80;
+  --amber: #8a5300;
+
+  /* Code highlighting, on --panel */
+  --code-keyword: #6a3dd0;
+  --code-control: #a8336a;
+  --code-name: #151922;
+  --code-function: #1f5be1;
+  --code-def: #0b6e80;
+  --code-string: #1b7a3a;
+  --code-number: #9a4a00;
+  --code-comment: #626a7b;
+  --code-selection: #c9d8fb;
+  --code-active-line: #f3f6fd;
+  /* The line matching the block selected in the blocks view (and vice versa). */
+  --code-linked: #fdf0c4;
+  /* Text on a block-coloured preview: Blockly's white, which BLOCK_COLOURS keep at AA. */
+  --on-block: #ffffff;
+
+  /* Art editors and the stage */
+  --checker-a: #f7f7f9;
+  --checker-b: #e6e7ec;
+  --grid-line: #00000017;
+  --guide: #d01b55;
+  --letterbox: #0d1017;
+  --overlay: #0d10178c;
+  --shadow: 0 8px 28px #0d101733;
+
+  /* Blockly surfaces */
+  --blocks-workspace: #f6f7fa;
+  --blocks-flyout: #eceef3;
+
+  /* Type */
+  --font-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --text-xs: 11px;
+  --text-s: 12px;
+  --text-m: 13px;
+  --text-l: 14px;
+
+  /* Spacing and radii */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --radius-s: 4px;
+  --radius: 6px;
+  --radius-l: 8px;
+  --radius-xl: 12px;
+
+  color-scheme: light;
+  font-family: var(--font-ui);
+  font-size: var(--text-l);
   color: var(--text);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #e8e6e3;
-    --muted: #9a9894;
-    --panel: #1e1e20;
-    --chrome: #161617;
-    --line: #2e2e31;
-    --accent: #7aa7ff;
-    --bad: #ff6b6b;
-  }
+:root[data-theme='dark'] {
+  --chrome: #11141a;
+  --panel: #191d25;
+  --well: #0c0f14;
+  --line: #2b313d;
+  --line-strong: #6f788b;
+  --text: #e7eaf0;
+  --muted: #9ba4b5;
+
+  --accent: #7aa2ff;
+  --on-accent: #0b1020;
+  --link: #8fb0ff;
+  --focus: #8fb0ff;
+  --go: #4cc77a;
+  --on-go: #06210f;
+  --bad: #ff7b7b;
+  --on-bad: #2a0606;
+  --warn: #f0b45a;
+
+  --violet: #b49cff;
+  --on-violet: #160b33;
+  --teal: #4fd1c5;
+  --amber: #f5b54a;
+
+  --code-keyword: #b49cff;
+  --code-control: #ff8fc0;
+  --code-name: #e7eaf0;
+  --code-function: #8fb0ff;
+  --code-def: #4fd1c5;
+  --code-string: #7fdc9a;
+  --code-number: #f5b54a;
+  --code-comment: #8a93a6;
+  --code-selection: #2c3f6b;
+  --code-active-line: #1e2330;
+  --code-linked: #2e2914;
+
+  --checker-a: #2a2f3a;
+  --checker-b: #222630;
+  --grid-line: #ffffff1f;
+  --guide: #ff5c8a;
+  --overlay: #000000a6;
+  --shadow: 0 8px 28px #00000080;
+
+  --blocks-workspace: #151920;
+  --blocks-flyout: #1d222c;
+
+  color-scheme: dark;
 }
 
 html, body { margin: 0; height: 100%; background: var(--chrome); }
+
+button, select, input, textarea { font: inherit; color: inherit; }
+
+button {
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: var(--space-1) 10px;
+  cursor: pointer;
+}
+button:hover:not(:disabled) { border-color: var(--text); }
+/* Lucide icons (lib/icons): sized by the font, centred beside any label. */
+button > svg.lucide-icon, label > svg.lucide-icon { width: 1.15em; height: 1.15em; vertical-align: -0.2em; flex: none; }
+button:has(> svg.lucide-icon) { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-1); }
+button:disabled { opacity: 0.45; cursor: default; }
+
+input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file']), select, textarea {
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 3px 6px;
+}
+
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+
+input[type='range'], input[type='checkbox'], input[type='radio'] { accent-color: var(--accent); }
+
+code, kbd, samp, pre { font-family: var(--font-mono); }
+
+a { color: var(--link); }
+
+/* While a sash is dragged (Sash.svelte), nothing else takes the pointer: iframes would swallow it. */
+body.sash-dragging { user-select: none; }
+body.sash-dragging iframe, body.sash-dragging .cm-editor, body.sash-dragging .blocks { pointer-events: none; }
+body.sash-horizontal, body.sash-horizontal * { cursor: col-resize !important; }
+body.sash-vertical, body.sash-vertical * { cursor: row-resize !important; }
