@@ -68,6 +68,11 @@
   article :global(table) { border-collapse: collapse; margin: var(--space-3) 0; }
   article :global(th), article :global(td) { border: 1px solid var(--line); padding: var(--space-1) var(--space-2); vertical-align: top; text-align: left; }
   article :global(img) { max-width: 100%; height: auto; }
+  /* Mermaid diagrams: one picture per theme (pages.ts), scrolling sideways on narrow screens. */
+  article :global(.diagram) { margin: var(--space-4) 0; overflow-x: auto; }
+  article :global(.diagram img) { display: block; margin: 0 auto; }
+  :global(html[data-theme='dark']) article :global(.diagram .light),
+  :global(html:not([data-theme='dark'])) article :global(.diagram .dark) { display: none; }
   article :global(blockquote) { margin: 0; padding-left: var(--space-3); border-left: 3px solid var(--line-strong); color: var(--muted); }
   @media (max-width: 720px) {
     .body { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }

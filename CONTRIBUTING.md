@@ -53,6 +53,7 @@ CI (`.github/workflows/ci.yml`) runs all of these, and a change should pass them
 |---|---|
 | `packages/lang/src/stitch.grammar` | `pnpm gen` (commit `parser.gen.js`) |
 | A docs example | `pnpm docs:blocks` |
+| A ```` ```mermaid ```` diagram in the docs | `pnpm docs:diagrams` |
 | The logo (`packages/editor/src/lib/logo.ts`) | `pnpm --filter @stitch/editor icons` |
 
 Each has a test that fails when the generated files are stale.

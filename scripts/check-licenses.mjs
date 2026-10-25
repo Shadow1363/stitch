@@ -18,6 +18,12 @@ const DEV_EXCEPTIONS = {
   'lightningcss-darwin-arm64': 'MPL-2.0; native binary of lightningcss (pending owner approval)',
   minimatch: 'BlueOak-1.0.0 (permissive); used by eslint (pending owner approval)',
   argparse: 'Python-2.0 (permissive); typedoc → markdown-it, API docs only (pending owner approval)',
+  elkjs:
+    'EPL-2.0; Mermaid layout engine, used only by `pnpm docs:diagrams` (pending owner approval)',
+  'robust-predicates':
+    'Unlicense (public domain); Mermaid geometry, docs:diagrams only (pending owner approval)',
+  khroma:
+    'MIT (its package.json has no license field); Mermaid colours, docs:diagrams only (pending owner approval)',
 };
 
 const list = (prod) =>

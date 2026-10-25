@@ -72,9 +72,9 @@ Packages export TS source directly (`"exports": "./src/index.ts"`). The only rea
 
 ## Commands
 
-`pnpm dev` · `pnpm test` (Node) · `pnpm test:browser` (Vitest browser mode, real WebGL pixel tests) · `pnpm typecheck` · `pnpm lint` · `pnpm build` · `pnpm gen` · `pnpm check:licenses` · `pnpm check:size` · `pnpm docs:reference` · `pnpm docs:blocks` · `pnpm docs:api`
+`pnpm dev` · `pnpm test` (Node) · `pnpm test:browser` (Vitest browser mode, real WebGL pixel tests) · `pnpm typecheck` · `pnpm lint` · `pnpm build` · `pnpm gen` · `pnpm check:licenses` · `pnpm check:size` · `pnpm docs:reference` · `pnpm docs:blocks` · `pnpm docs:diagrams` · `pnpm docs:api`
 
-CI (`.github/workflows/ci.yml`) runs all of these except `docs:blocks` (which needs a browser and writes files), plus `prettier --check "**/*.ts"`.
+CI (`.github/workflows/ci.yml`) runs all of these except `docs:blocks` and `docs:diagrams` (which need a browser and write files), plus `prettier --check "**/*.ts"`.
 
 - `pnpm docs:api` writes TypeDoc HTML for every package export to `docs/api/` (git-ignored); warnings fail it. `pnpm --filter @stitch/editor icons` regenerates the logo icons.
 
@@ -109,6 +109,7 @@ CI (`.github/workflows/ci.yml`) runs all of these except `docs:blocks` (which ne
 - **Docs:** a new builtin, keyword, block type, music effect or cart field gets documented in the same change. The docs check (`packages/blocks/src/docs.test.ts`, part of `pnpm test`) fails without it.
   - Every `###` entry in `docs/reference.md` lives in the docs registry (`blocks/src/reference/*.ts`) and is written into `<!-- generated: id -->` regions by `pnpm docs:reference`; edit the registry, never those regions. Section intros outside the regions stay hand-written. Cart fields go in `docs/cart-format.md`.
   - An example is a `stitch` fence right after `<!-- example: name -->`. Its block picture is `docs/blocks/<name>.svg`, rendered from the same text by `pnpm docs:blocks` (`toBlocks` plus real Blockly in headless Chromium, `packages/blocks/scripts/docs-blocks.ts`). Each SVG carries a hash of its example, so the check catches stale pictures in Node. Snippets that aren't top-level items are parsed inside `on start do … end`, and may use undeclared variables but nothing else invalid.
+  - Diagrams are ```` ```mermaid ```` fences, which GitHub draws itself. `docs.html` shows `docs/diagrams/<hash>-light.svg` and `-dark.svg` instead (`pages.ts`, hashed by `@stitch/blocks/diagrams`). `pnpm docs:diagrams` renders them with Mermaid in headless Chromium (`packages/blocks/scripts/docs-diagrams.ts`). Mermaid is a root dev dependency and ships in nothing, and the docs check catches missing or stale pictures.
   - A `json` fence after `<!-- manifest -->` declares an extension manifest that examples may use.
   - The check also covers every keyword in the grammar, every block type, every effect in `EFFECTS`, every field of a fully filled cart (`Required<Cart>`, so a new field is a type error until it's added there), and every relative link and anchor in README, CONTRIBUTING and `docs/`.
   - `docs/departures.md`, `docs/plan.md` and this file stay the sources of truth; user docs link to them rather than copy them. The tutorials (`docs/tutorials/`) are verified by following them in the editor; update them when the UI they describe changes.

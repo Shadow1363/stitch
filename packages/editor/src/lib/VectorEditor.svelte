@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Circle, Crosshair, MousePointer2, PenTool, RectangleHorizontal, Redo2, Slash, Trash2, Undo2 } from '@lucide/svelte';
+  import { Circle, Crosshair, MousePointer2, PenTool, RectangleHorizontal, Redo2, Slash, Spline, Trash2, Undo2 } from '@lucide/svelte';
   import type { SvgAsset } from '@stitch/cart';
   import { svgSize } from '@stitch/cart/render';
   import paper from 'paper/dist/paper-core';
@@ -12,9 +12,10 @@
   }
   let { asset, onchange }: Props = $props();
 
-  type Tool = 'select' | 'pen' | 'rect' | 'ellipse' | 'line' | 'center';
+  type Tool = 'select' | 'reshape' | 'pen' | 'rect' | 'ellipse' | 'line' | 'center';
   const TOOLS: { id: Tool; label: string; key: string; icon: typeof PenTool }[] = [
     { id: 'select', label: 'Select', key: 'v', icon: MousePointer2 },
+    { id: 'reshape', label: 'Reshape', key: 'a', icon: Spline },
     { id: 'pen', label: 'Pen', key: 'p', icon: PenTool },
     { id: 'rect', label: 'Rect', key: 'r', icon: RectangleHorizontal },
     { id: 'ellipse', label: 'Ellipse', key: 'o', icon: Circle },
@@ -37,6 +38,10 @@
   let scope: paper.PaperScope;
   let shown: SvgAsset = first;
   let selected: paper.Item | null = null;
+  /** The shape whose points the Reshape tool shows, as in Scratch. */
+  let target: paper.Path | paper.CompoundPath | null = null;
+  /** How many of its points are selected; the Curved and Pointed buttons act on them. */
+  let pointCount = $state(0);
   let undoStack: string[] = [];
   let redoStack: string[] = [];
 
@@ -52,6 +57,8 @@
     scope.view.center = new scope.Point(size.width / 2, size.height / 2);
     scope.project.clear();
     selected = null;
+    target = null;
+    pointCount = 0;
     scope.project.importSVG(svg, { insert: true, expandShapes: true });
   }
 
@@ -89,15 +96,102 @@
     commit(before);
   }
 
+  // ---- reshape: points and handles ----
+
+  const segmentsOf = (item: paper.Item): paper.Segment[] =>
+    item instanceof scope.CompoundPath ? item.children.flatMap((c) => (c as paper.Path).segments) : item instanceof scope.Path ? item.segments : [];
+  const selectedPoints = () => (target ? segmentsOf(target).filter((s) => s.selected) : []);
+  /** The path or compound path a hit belongs to (a compound path's points live in its children). */
+  const shapeOf = (item: paper.Item): paper.Path | paper.CompoundPath | null => {
+    const parent = item.parent;
+    if (parent instanceof scope.CompoundPath) return parent;
+    return item instanceof scope.Path || item instanceof scope.CompoundPath ? item : null;
+  };
+
+  /** Shows `shape`'s points (or hides the current one's), keeping no point selected. */
+  function reshape(shape: paper.Path | paper.CompoundPath | null) {
+    if (target && target !== shape) {
+      for (const s of segmentsOf(target)) s.selected = false;
+      target.selected = false;
+    }
+    target = shape;
+    if (shape) {
+      shape.selected = true;
+      select(null);
+      selected = shape; // so the style controls and Delete act on it
+      noFill = !shape.fillColor;
+      if (shape.fillColor) fill = shape.fillColor.toCSS(true);
+      if (shape.strokeColor) stroke = shape.strokeColor.toCSS(true);
+      strokeWidth = shape.strokeWidth;
+    }
+    pointCount = selectedPoints().length;
+  }
+
+  function choosePoint(seg: paper.Segment, add: boolean) {
+    if (add) seg.selected = !seg.selected;
+    else if (!seg.selected) {
+      for (const s of selectedPoints()) s.selected = false;
+      seg.selected = true;
+    }
+    pointCount = selectedPoints().length;
+  }
+
+  /** Curved: smooth handles through the point. Pointed: no handles, so the outline has a corner. */
+  function setCurved(curved: boolean) {
+    const pts = selectedPoints();
+    if (!pts.length) return;
+    const before = exportSvg();
+    for (const s of pts) {
+      if (curved) s.smooth({ type: 'catmull-rom' });
+      else {
+        s.handleIn = new scope.Point(0, 0);
+        s.handleOut = new scope.Point(0, 0);
+      }
+    }
+    commit(before);
+  }
+
+  /** Deletes the selected points; a shape left with too few points goes too. */
+  function removePoints(): boolean {
+    const pts = selectedPoints();
+    if (!target || !pts.length) return false;
+    const before = exportSvg();
+    for (const s of pts) {
+      const path = s.path;
+      s.remove();
+      if (path.segments.length < (path.closed ? 3 : 2)) path.remove();
+    }
+    if (!segmentsOf(target).length || !target.parent) {
+      target.remove();
+      target = null;
+      selected = null;
+    }
+    pointCount = selectedPoints().length;
+    commit(before);
+    return true;
+  }
+
   onMount(() => {
     scope = new paper.PaperScope();
     scope.setup(canvas);
+    // Points and handles big enough to see and grab, as in Scratch's reshape tool.
+    scope.settings.handleSize = 8;
+    // Paper skips the point squares while this is unset; hollow ones are unselected points.
+    (scope.settings as { segmentSize?: number }).segmentSize = 9;
     load(asset.svg);
     const t = new scope.Tool();
     let start: paper.Point | null = null;
     let shape: paper.Path | null = null;
     let before = '';
     let moved = false;
+    /** What a Reshape drag moves: the selected points, one handle, or the whole shape. */
+    let drag:
+      | { kind: 'points' }
+      | { kind: 'handle'; seg: paper.Segment; which: 'handleIn' | 'handleOut' }
+      | { kind: 'shape' }
+      | null = null;
+    /** A point was added on mouse down, which is a change even without a drag. */
+    let added = false;
 
     t.onMouseDown = (e: paper.ToolEvent) => {
       before = exportSvg();
@@ -114,6 +208,43 @@
         select(hit?.item ?? null);
         return;
       }
+      if (tool === 'reshape') {
+        added = false;
+        drag = null;
+        const tolerance = 8 / scale;
+        // Handles first, but only those showing: the handles of selected points.
+        const handle = target
+          ? scope.project.hitTest(e.point, { handles: true, tolerance, match: (h: paper.HitResult) => h.segment?.selected === true && shapeOf(h.item) === target })
+          : null;
+        if (handle) {
+          drag = { kind: 'handle', seg: handle.segment, which: handle.type === 'handle-in' ? 'handleIn' : 'handleOut' };
+          return;
+        }
+        // Points win over the outline they sit on, so grabbing a corner never adds a point.
+        const hit =
+          scope.project.hitTest(e.point, { segments: true, tolerance }) ??
+          scope.project.hitTest(e.point, { stroke: true, fill: true, tolerance });
+        const shape = hit ? shapeOf(hit.item) : null;
+        if (!hit || !shape) {
+          reshape(null);
+          selected = null;
+          return;
+        }
+        if (shape !== target) reshape(shape);
+        if (hit.type === 'segment') {
+          choosePoint(hit.segment, e.modifiers.shift);
+          drag = { kind: 'points' };
+        } else if (hit.type === 'stroke' && hit.location) {
+          // Clicking the outline of the shape being reshaped adds a point there, as in Scratch.
+          const seg = (hit.location.path as paper.Path).divideAt(hit.location);
+          if (seg) {
+            choosePoint(seg, false);
+            added = true;
+            drag = { kind: 'points' };
+          }
+        } else drag = { kind: 'shape' };
+        return;
+      }
       select(null);
       if (tool === 'pen') {
         shape = new scope.Path({ ...styleOf(), fillColor: null, strokeCap: 'round', strokeJoin: 'round' });
@@ -126,6 +257,20 @@
       moved = true;
       if (tool === 'select') {
         if (selected) selected.position = selected.position.add(e.delta);
+        return;
+      }
+      if (tool === 'reshape') {
+        if (!drag || !target) return;
+        if (drag.kind === 'shape') target.position = target.position.add(e.delta);
+        else if (drag.kind === 'points') for (const s of selectedPoints()) s.point = s.point.add(e.delta);
+        else {
+          const { seg, which } = drag;
+          const other = which === 'handleIn' ? 'handleOut' : 'handleIn';
+          // A smooth point keeps its handles in line, unless Alt breaks them apart.
+          const smooth = !e.modifiers.alt && !seg[other].isZero() && seg[which].isCollinear(seg[other]);
+          seg[which] = seg[which].add(e.delta);
+          if (smooth) seg[other] = seg[which].normalize(-seg[other].length);
+        }
         return;
       }
       if (tool === 'pen') {
@@ -144,13 +289,19 @@
         if (shape.segments.length > 2) shape.simplify(2.5);
         else if (!moved) shape.remove();
       }
-      const changed = moved && (tool !== 'select' || selected);
+      const changed = tool === 'reshape' ? (moved && drag !== null) || added : moved && (tool !== 'select' || selected);
+      drag = null;
       if (shape && tool !== 'pen') select(shape);
       shape = null;
       start = null;
       if (changed) commit(before);
     };
     return () => scope.project.remove();
+  });
+
+  // Leaving Reshape hides the points.
+  $effect(() => {
+    if (tool !== 'reshape' && target) untrack(() => reshape(null));
   });
 
   // Switching costumes loads the other drawing with its own history.
@@ -186,6 +337,10 @@
     if (!selected) return;
     const before = exportSvg();
     selected.remove();
+    if (selected === target) {
+      target = null;
+      pointCount = 0;
+    }
     selected = null;
     commit(before);
   }
@@ -203,7 +358,7 @@
     }
     if (k === 'delete' || k === 'backspace') {
       e.preventDefault();
-      remove();
+      if (!(tool === 'reshape' && removePoints())) remove();
       return;
     }
     if (mod) return;
@@ -240,6 +395,13 @@
     <label><input type="checkbox" bind:checked={noFill} onchange={restyle} /> none</label>
     <label>Stroke <input type="color" bind:value={stroke} onchange={restyle} /></label>
     <label>Width <input type="number" min="0" max="40" bind:value={strokeWidth} onchange={restyle} /></label>
+    {#if tool === 'reshape'}
+      <span class="gap"></span>
+      <button onclick={() => setCurved(true)} disabled={!pointCount} title="Smooth the selected points">Curved</button>
+      <button onclick={() => setCurved(false)} disabled={!pointCount} title="Make the selected points corners">Pointed</button>
+      <span class="muted">{pointCount ? `${pointCount} point${pointCount > 1 ? 's' : ''}` : 'Click the outline to add a point'}</span>
+      <span class="gap"></span>
+    {/if}
     <span class="muted">{size.width}×{size.height} · center {center[0]}, {center[1]}</span>
   </div>
   <div class="canvas-wrap">

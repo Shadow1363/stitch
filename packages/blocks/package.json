@@ -8,6 +8,7 @@
     "./workspace": "./src/workspace.ts",
     "./color": "./src/color.ts",
     "./docs": "./src/docs.ts",
+    "./diagrams": "./src/diagrams.ts",
     "./registry": "./src/registry.ts"
   },
   "dependencies": {

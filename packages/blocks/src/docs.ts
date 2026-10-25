@@ -7,6 +7,7 @@
  */
 import { CORE_CATALOG, validateModule, type Catalog, type Module } from '@stitch/ir';
 import { parse } from '@stitch/lang';
+import { sourceHash } from './diagrams';
 import type { BlockJson } from './json';
 import { toBlocks } from './toBlocks';
 
@@ -30,11 +31,7 @@ export function manifestsIn(markdown: string): unknown[] {
 }
 
 /** FNV-1a of the example text; images carry it so a stale image is caught without a browser. */
-export function exampleHash(code: string): string {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < code.length; i++) h = Math.imul(h ^ code.charCodeAt(i), 0x01000193);
-  return (h >>> 0).toString(16).padStart(8, '0');
-}
+export const exampleHash = sourceHash;
 
 export interface ExampleResult {
   module: Module;

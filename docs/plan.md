@@ -21,6 +21,7 @@ Architecture rules, stack and conventions are in [`CLAUDE.md`](../CLAUDE.md). De
 | 13    | Editor chrome: docs, icons, pause, full screen | ✅ Done                   |
 | 14    | The rest of Scratch 3      | ✅ Done (awaiting review) |
 | 15    | Importing Scratch projects (.sb3) | ✅ Done (awaiting review) |
+| 16    | Vector point editing, docs diagrams | ✅ Done (awaiting review) |
 
 **Performance targets:** 1,000 moving sprites at 60 fps on a mid-range laptop. Editor first load under 2 s on broadband. Runtime-only export bundle under 500 KB gzipped (172 KB at Phase 6, enforced in CI).
 
@@ -97,7 +98,7 @@ Delivered:
 - `@stitch/cart/render` draws any asset to an image, for both the editor and future exported players.
 - `@stitch/cart/png` stores the cart as zlib JSON (fflate) in a private `stCt` chunk of the cover PNG.
 - **Pixel editor:** pencil, eraser, fill, line, rectangle, picker and centre tools; palette editing; layers; costumes as animation frames with onion skin; zoom and grid; its own undo.
-- **Vector editor** (Paper.js, lazy): select, pen, rectangle, ellipse, line and centre tools; fill and stroke; SVG import and export; its own undo.
+- **Vector editor** (Paper.js, lazy): select, reshape (Phase 16), pen, rectangle, ellipse, line and centre tools; fill and stroke; SVG import and export; its own undo.
 - **Tile map editor:** a starter tileset, painting and resizing, tileset editing in the pixel editor. New builtins `tile_at` / `set_tile` with blocks; the map is anchored at the stage's top-left.
 - **Carts:** save as `.stitch.png` (the cover shows the starting frame and the title); open by file, drag-and-drop or `?cart=URL`; autosave to IndexedDB with restore on load.
 - **Cart panel:** title, author and every stage setting. Sprites can be added, renamed and deleted.
@@ -578,11 +579,30 @@ Known gaps:
 - SVG costumes that use Scratch's own fonts fall back to browser fonts.
 - Extensions other than Pen (Music, Text to Speech, Translate, Video Sensing, TurboWarp's) aren't converted.
 
+## Phase 16 — Vector point editing and docs diagrams ✅
+
+- **Reshape tool** (`A`) in the vector editor, like Scratch's:
+  - Clicking a shape shows its points: hollow squares, filled once selected, with the selected points' handles.
+  - Dragging a point moves it, and Shift-click selects several, which move together. Dragging the shape moves it.
+  - Clicking the outline adds a point there.
+  - Dragging a handle bends the curve. A smooth point keeps its two handles in line; hold Alt to break them apart.
+  - **Curved** and **Pointed** smooth the selected points or make them corners.
+  - Delete removes the selected points, and a shape left with too few points goes too.
+  - Compound paths and shapes inside imported groups work the same way. Every change is one undo step.
+- **Diagrams on the docs site:** ```` ```mermaid ```` fences showed as code in `docs.html`, which renders markdown with `marked`; only GitHub drew them.
+  - `pnpm docs:diagrams` renders each fence with Mermaid in headless Chromium to `docs/diagrams/<hash>-light.svg` and `-dark.svg`, with SVG labels so they work as images. `pages.ts` swaps the fence for the picture matching the theme, linked to its full-size file.
+  - Mermaid is a dev dependency only, so nothing new ships, and the docs check fails when a picture is missing or stale.
+
+Known gaps:
+
+- The vector editor has no text tool, so imported text can be moved and restyled but not retyped.
+- Reshape has no box selection; Shift-click picks several points.
+
 ## Open decisions (owner)
 
 1. Approve the Scratch departures D1–D36 in `departures.md` (D36, merging each sprite's sounds into the cart's bank on import, is new in Phase 15; D33–D35, the clock sampled per tick, the editor-proxied microphone and drag mode everywhere, are new in Phase 14; D32, `ask`'s answer field and `frame_count`, in Phase 11). D24–D31 are new in Phase 9: pen shapes and layer, the clone-limit error, `shared var`, CPU-only colour sensing, fixed `delta_time`, `watch` monitors, `break`/`continue`/dictionaries and the pixel font. D21 changed: JSON objects now become dictionaries.
 2. License approvals:
-   - dev-only exceptions `lightningcss` (MPL-2.0), `minimatch` (BlueOak-1.0.0) and `argparse` (Python-2.0, via TypeDoc for the API docs)
+   - dev-only exceptions `lightningcss` (MPL-2.0), `minimatch` (BlueOak-1.0.0) and `argparse` (Python-2.0, via TypeDoc for the API docs), plus Mermaid's `elkjs` (EPL-2.0), `robust-predicates` (Unlicense) and `khroma` (MIT, unlabelled) for `pnpm docs:diagrams` (Phase 16)
    - `idb` (ISC), or keep the in-house wrapper
 3. Audio engine: Phase 4 replaced Tone.js and jsfxr with an in-house renderer (reasons above). Confirm, or say if you want Tone.js back for live instruments.
 4. Default renderer: WebGL (current) or WebGPU. Both hold 60 fps at 1,000 sprites on the M2.

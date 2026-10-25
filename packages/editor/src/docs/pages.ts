@@ -3,6 +3,7 @@
  * README and CONTRIBUTING, and the pictures they show, bundled at build time so the docs work
  * offline and in the desktop app and match the editor they came with.
  */
+import { diagramFile } from '@stitch/blocks/diagrams';
 import { Marked, type Tokens } from 'marked';
 
 // Repo-relative paths from this file's folder (packages/editor/src/docs).
@@ -137,6 +138,17 @@ const marked = new Marked({
   renderer: {
     heading({ tokens, depth, text }: Tokens.Heading) {
       return `<h${depth} id="${slug(text)}">${this.parser.parseInline(tokens)}</h${depth}>\n`;
+    },
+    // Mermaid diagrams show as the pictures `pnpm docs:diagrams` renders, one per theme (the CSS
+    // in Docs.svelte shows the right one). A diagram without pictures stays code.
+    code({ text, lang }: Tokens.Code) {
+      const light = lang === 'mermaid' ? ASSETS[diagramFile(text, 'light')] : undefined;
+      const dark = lang === 'mermaid' ? ASSETS[diagramFile(text, 'dark')] : undefined;
+      if (!light || !dark) return false;
+      // Each picture links to itself at full size, since wide ones are scaled down to fit.
+      const img = (theme: string, src: string) =>
+        `<a class="${theme}" href="${src}" target="_blank" rel="noopener" title="Open full size"><img src="${src}" alt="Diagram" /></a>`;
+      return `<figure class="diagram">${img('light', light)}${img('dark', dark)}</figure>\n`;
     },
   },
 });

@@ -62,4 +62,4 @@ The code means the same, but a few of Stitch's [departures](departures.md) can c
 
 - Hats fired during a tick start on the next tick ([D6](departures.md)). Scratch starts them in the same frame. A project that creates a clone or broadcasts, then changes a variable straight after `wait 0`, can find the new script reading the changed value.
 - Clones past `stage.cloneLimit` (300, like Scratch) are an error instead of being ignored.
-- SVG text uses the browser's fonts. Scratch's own fonts (*Handwriting*, *Marker*, *Curly* and so on) fall back to a similar one.
+- Text in vector costumes keeps the font names Scratch saved (*Sans Serif*, *Handwriting*, *Marker* and so on). Browsers don't have those fonts, so the text draws in the browser's default font.

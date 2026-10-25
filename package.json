@@ -19,6 +19,7 @@
     "check:licenses": "node scripts/check-licenses.mjs",
     "check:size": "pnpm --filter @stitch/export build",
     "docs:blocks": "node packages/blocks/scripts/docs-blocks.ts",
+    "docs:diagrams": "node packages/blocks/scripts/docs-diagrams.ts",
     "docs:reference": "node packages/blocks/scripts/docs-reference.ts",
     "docs:api": "typedoc"
   },
@@ -28,6 +29,7 @@
     "@vitest/browser-playwright": "^5.0.5",
     "eslint": "^10.13.0",
     "fast-check": "^4.10.2",
+    "mermaid": "^12.2.0",
     "playwright": "^1.64.1",
     "prettier": "^3.9.10",
     "typedoc": "^0.28.20",

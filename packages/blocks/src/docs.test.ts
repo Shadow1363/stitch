@@ -25,6 +25,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { DEFINITIONS } from './definitions';
+import { diagramFile, diagramsIn } from './diagrams';
 import {
   blockTypes,
   exampleBlocks,
@@ -132,6 +133,19 @@ describe('examples', () => {
     const orphans = readdirSync(join(root, 'docs/blocks')).filter(
       (f) => !names.includes(f.replace(/\.svg$/, '')),
     );
+    expect(orphans).toEqual([]);
+  });
+});
+
+describe('diagrams', () => {
+  it('have current pictures in both themes (run `pnpm docs:diagrams`)', () => {
+    const texts = docs.flatMap((d) => diagramsIn(d.text));
+    const wanted = texts.flatMap((t) => [diagramFile(t, 'light'), diagramFile(t, 'dark')]);
+    expect(wanted.filter((f) => !existsSync(join(root, f)))).toEqual([]);
+    const dir = join(root, 'docs/diagrams');
+    const orphans = existsSync(dir)
+      ? readdirSync(dir).filter((f) => !wanted.includes(`docs/diagrams/${f}`))
+      : [];
     expect(orphans).toEqual([]);
   });
 });
