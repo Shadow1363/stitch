@@ -53,5 +53,23 @@ export const sound: DocSection = {
       example: `change_volume(-10)`,
       alt: 'change volume by -10',
     },
+    {
+      id: 'set_sound_effect',
+      doc: 'Sets one of this sprite\'s sound effects: `"pitch"` (10 is a semitone, ±360) or `"pan"` (-100 left to 100 right). It changes the sounds the sprite is playing and the ones it plays next. `play_sound_wait` waits less for a sound pitched up.',
+      example: `set_sound_effect("pitch", 120)`,
+      alt: 'set pitch effect to 120',
+    },
+    {
+      id: 'change_sound_effect',
+      doc: "Changes one of this sprite's sound effects by an amount.",
+      example: `change_sound_effect("pan", -50)`,
+      alt: 'change pan effect by -50',
+    },
+    {
+      id: 'clear_sound_effects',
+      doc: "Puts this sprite's pitch and pan back to 0.",
+      example: `clear_sound_effects()`,
+      alt: 'clear sound effects',
+    },
   ],
 };

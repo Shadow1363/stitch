@@ -215,6 +215,13 @@ export const topItemArb: fc.Arbitrary<TopItem> = fc.oneof(
         fc.constant({ type: 'click' as const }),
         fc.constantFrom('space', 'left', 'a').map((key) => ({ type: 'key' as const, key })),
         fc.string({ maxLength: 5 }).map((n) => ({ type: 'message' as const, name: n })),
+        fc
+          .tuple(
+            fc.constantFrom('timer' as const, 'loudness' as const),
+            fc.constantFrom(0, 2.5, 10),
+          )
+          .map(([what, value]) => ({ type: 'greater' as const, what, value })),
+        fc.string({ maxLength: 5 }).map((n) => ({ type: 'backdrop' as const, name: n })),
       ),
       fc.array(stmtArb, { maxLength: 4 }),
     )

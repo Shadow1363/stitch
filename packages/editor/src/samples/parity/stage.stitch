@@ -1,0 +1,27 @@
+-- Scratch Parity: checks that Stitch's blocks behave like Scratch 3's, then shows the newest
+-- ones live. Press Run and watch the console: the Checker prints PASS or FAIL for each check,
+-- and the totals stay on stage.
+-- After the checks: drag the cat, press Space for a sound (Up and Down change its pitch, Left
+-- and Right its pan), clap for the loudness hat, and watch the backdrops go by.
+global var passed = 0
+global var failed = 0
+-- Set by the hats below, for the Checker to look at.
+global var night_hits = 0
+global var dusk_done = false
+global var timer_fired = false
+
+on backdrop "night" do
+  night_hits += 1
+end
+
+on backdrop "dusk" do
+  wait(0.2)
+  dusk_done = true
+end
+
+on message "demo" do
+  forever do
+    wait(3)
+    next_backdrop()
+  end
+end

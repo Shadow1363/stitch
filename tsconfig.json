@@ -7,6 +7,7 @@
     "packages/runtime/src",
     "packages/compiler/src",
     "packages/blocks/src",
+    "packages/sb3/src",
     "vitest.config.ts",
     "vitest.browser.config.ts",
     "packages/export/src",

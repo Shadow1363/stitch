@@ -24,6 +24,9 @@ import { Dict, type Value } from './values';
 export interface WorldOptions {
   stage: StageSettings;
   sprites: SpriteInit[];
+  /** The stage's backdrops (asset ids into `costumes`) and the 1-based one shown first. */
+  backdrops?: string[];
+  backdrop?: number;
   /** Costume metadata by asset id. Sizes come from the decoded images. */
   costumes: Record<string, CostumeInfo>;
   /** Tile map drawn behind sprites, if the cart has one. */
@@ -41,6 +44,10 @@ export interface WorldOptions {
   seed?: number;
   /** Clock for the warp budget; injectable for tests. */
   now?: () => number;
+  /** Wall clock (ms since 1970) for `current` and `days_since_2000`; sampled once a tick. */
+  clock?: () => number;
+  /** What `username()` reports. Stitch has no accounts, so players and the editor leave it "". */
+  username?: string;
   onLog?: (sprite: string, text: string) => void;
   onError?: (e: { sprite: string; event: string; error: unknown }) => void;
 }
@@ -132,8 +139,20 @@ export class World implements RenderView {
   volume = 100;
   ticks = 0;
   timerStart = 0;
+  /** Microphone level 0–100, or -1 with no microphone (as Scratch). */
+  loudness = -1;
+  /** The wall clock at the start of this tick, so every script in a tick sees one time (D33). */
+  wallTime = 0;
+  readonly username: string;
+  /** The sprite being dragged (drag mode on) and where the pointer holds it. */
+  private drag: { sprite: Sprite; dx: number; dy: number } | undefined;
+  /** Seconds since Run or the last `reset_timer`, in simulation time (D4). */
+  get timer(): number {
+    return (this.ticks - this.timerStart) / 60;
+  }
   private tickStart = 0;
   private readonly now: () => number;
+  private readonly clock: () => number;
   private drawList: Sprite[];
   private currentSprite = '';
 
@@ -142,7 +161,18 @@ export class World implements RenderView {
     this.now = opts.now ?? (() => performance.now());
     this.random = createRandom(opts.seed ?? (Math.random() * 2 ** 32) >>> 0);
     this.scheduler = new Scheduler((e) => this.reportError(e));
-    this.stage = new Sprite(STAGE_ID, 'stage', [], true);
+    const backdrops = (opts.backdrops ?? [])
+      .map((id) => opts.costumes[id])
+      .filter((c): c is CostumeInfo => c !== undefined);
+    this.stage = new Sprite(STAGE_ID, 'stage', backdrops, true);
+    // The backdrop's centre sits at the stage's centre, as in Scratch.
+    const mid = this.space.fromStagePx(this.space.width / 2, this.space.height / 2);
+    this.stage.moveTo(mid.x, mid.y);
+    if (backdrops.length)
+      this.stage.costume = Math.max(0, Math.min(backdrops.length - 1, (opts.backdrop ?? 1) - 1));
+    this.clock = opts.clock ?? (() => Date.now());
+    this.username = opts.username ?? '';
+    this.wallTime = this.clock();
     this.all = opts.sprites.map((init) => {
       const costumes = init.costumes
         .map((id) => opts.costumes[id])
@@ -232,13 +262,24 @@ export class World implements RenderView {
 
   tick(): void {
     this.tickStart = this.now();
+    this.wallTime = this.clock();
     for (const key of this.input.takePressed()) this.scheduler.trigger('key', key, false);
     for (const c of this.input.takeClicks()) {
       const p = this.space.toStagePx(c.x, c.y);
       // The topmost sprite under the pointer gets the click; empty stage goes to the stage.
       const hit = spriteAt(this.drawList, this.space, p.x, p.y) ?? this.stage;
+      if (hit.draggable && !hit.deleted) {
+        // Scratch brings a dragged sprite to the front.
+        this.drag = { sprite: hit, dx: hit.x - c.x, dy: hit.y - c.y };
+        this.moveLayer(hit, Infinity);
+      }
       this.scheduler.trigger('click', null, true, hit);
     }
+    const d = this.drag;
+    if (d && (!this.input.mouseDown || d.sprite.deleted || !d.sprite.draggable))
+      this.drag = undefined;
+    else if (d) d.sprite.moveTo(this.input.mouseX + d.dx, this.input.mouseY + d.dy);
+    this.scheduler.checkEdges((e) => (e === 'timer' ? this.timer : this.loudness));
     this.scheduler.step();
     this.ticks++;
   }
@@ -290,6 +331,8 @@ export class World implements RenderView {
     c.visible = parent.visible;
     c.rotationStyle = parent.rotationStyle;
     c.effects = { ...parent.effects };
+    c.soundEffects = { ...parent.soundEffects };
+    c.draggable = parent.draggable;
     c.pen = { ...parent.pen };
     c.penMoved = parent.penMoved;
     fam.clones.add(c);

@@ -1,0 +1,85 @@
+-- Runs every check in order, then starts the demo. Each check prints PASS or FAIL and its name.
+on start do
+  -- Operators, with Scratch's rules for numbers and text
+  check("join turns values into text", "a" .. 1 .. true == "a1true")
+  check("numeric text compares as a number", "10" == 10)
+  check("mod is floored", -7 % 3 == 2)
+  check("round goes half up", round(2.5) == 3)
+  check("dividing by zero is infinite", 1 / 0 > 1000000)
+  check("trig is in degrees", round(sin(90)) == 1 and round(cos(180)) == -1)
+  check("mathop", floor(-2.5) == -3 and abs(-4) == 4 and sqrt(16) == 4)
+  check("letter of", letter_of(2, "apple") == "p")
+  check("letter of past the end", letter_of(9, "abc") == "")
+  check("length of text", len("hello") == 5)
+  check("text contains", contains("hello", "ell"))
+  -- Lists count from 1
+  local items = [10, 20, 30]
+  check("item 1 is the first", items[1] == 10)
+  push(items, 40)
+  check("add to list", len(items) == 4 and items[4] == 40)
+  insert(items, 1, 5)
+  check("insert at 1", items[1] == 5)
+  remove(items, 1)
+  check("delete item", items[1] == 10)
+  items[2] = 99
+  check("replace item", items[2] == 99)
+  check("item number of", index_of(items, 30) == 3)
+  check("list contains", contains(items, 99))
+  -- Motion and sensing other sprites
+  check("x position of", x_of("Target") == 60 and y_of("Target") == -30)
+  check("size of", size_of("Cat") == 100)
+  broadcast_wait("glide test")
+  check("glide to a sprite", x_of("Cat") == 60 and y_of("Cat") == -30)
+  check("touching a sprite", var_of("Cat", "touched"))
+  broadcast_wait("go home")
+  check("go to x y", x_of("Cat") == 0 and y_of("Cat") == 0)
+  -- Backdrops
+  check("starts on the first backdrop", backdrop_number() == 1 and backdrop_name() == "day")
+  backdrop("night")
+  check("switch backdrop by name", backdrop_name() == "night")
+  next_backdrop()
+  check("next backdrop", backdrop_number() == 3)
+  next_backdrop()
+  check("next backdrop wraps around", backdrop_number() == 1)
+  backdrop("previous backdrop")
+  check("previous backdrop", backdrop_name() == "dusk")
+  backdrop(2)
+  -- Hats started this tick run from the next one (D6), after this script.
+  wait(0.1)
+  check("when backdrop switches to", night_hits > 0)
+  backdrop_wait("dusk")
+  check("switch backdrop and wait", dusk_done)
+  backdrop("day")
+  -- Clones
+  create_clone()
+  check("create clone", clone_count() == 1)
+  -- Sensing
+  check("current year", current("year") >= 2024)
+  check("days since 2000", days_since_2000() > 8000)
+  check("username is empty when signed out", username() == "")
+  check("loudness is -1 or a level", loudness() >= -1)
+  wait until timer_fired
+  check("when timer >", timer() > 0.5)
+  print("Scratch parity: " .. passed .. " passed, " .. failed .. " failed")
+  broadcast("demo")
+end
+
+on clone do
+  delete_clone()
+end
+
+on timer > 0.5 do
+  timer_fired = true
+end
+
+function check(name, ok)
+  if ok then
+    passed += 1
+    print("PASS " .. name)
+  else
+    failed += 1
+    print("FAIL " .. name)
+  end
+  watch("passed", passed)
+  watch("failed", failed)
+end

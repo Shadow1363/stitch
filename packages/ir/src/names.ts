@@ -10,12 +10,15 @@ export interface CartNames {
   costumes: Readonly<Record<string, readonly string[]>>;
   sounds: readonly string[];
   songs: readonly string[];
+  /** The stage's backdrop names. Optional so older callers needn't list them. */
+  backdrops?: readonly string[];
 }
 
 /** Words a parameter accepts besides cart names: special targets, effects, styles and keys. */
 export const REF_WORDS: Record<ParamRef, readonly string[]> = {
   sprite: ['mouse', 'random', 'myself', 'edge', 'stage'],
   costume: [],
+  backdrop: ['next backdrop', 'previous backdrop', 'random backdrop'],
   sound: [],
   song: [],
   message: [],
@@ -30,7 +33,9 @@ export const REF_WORDS: Record<ParamRef, readonly string[]> = {
     'any',
     ...'abcdefghijklmnopqrstuvwxyz0123456789',
   ],
-  effect: ['ghost', 'brightness', 'color'],
+  effect: ['ghost', 'brightness', 'color', 'fisheye', 'whirl', 'pixelate', 'mosaic'],
+  sound_effect: ['pitch', 'pan'],
+  time_unit: ['year', 'month', 'date', 'day of week', 'hour', 'minute', 'second'],
   rotation: ['all around', 'left-right', "don't rotate"],
 };
 

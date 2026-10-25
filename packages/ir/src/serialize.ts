@@ -15,6 +15,7 @@ export function migrateProject(data: unknown): Project {
   if (typeof v !== 'number') throw new Error('project: missing irVersion');
   if (v > IR_VERSION)
     throw new Error(`project: irVersion ${v} is newer than this build supports (${IR_VERSION})`);
-  // 1 -> 2 only added shapes (Break, Continue, clone and click events, shared vars): no rewrite.
+  // 1 -> 2 only added shapes (Break, Continue, clone and click events, shared vars), and
+  // 2 -> 3 the timer/loudness and backdrop events: no rewrite.
   return { ...(data as Project), irVersion: IR_VERSION };
 }

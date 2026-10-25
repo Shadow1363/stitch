@@ -3,11 +3,11 @@ import type { TileMap } from './map';
 import { emptyMusic, normalizeMusic, type Music } from './music';
 import { DEFAULT_PALETTE } from './palette';
 import type { PixelLayer } from './pixel';
-import { normalizeSfx, type Sound } from './sfx';
+import { MAX_SAMPLE_RATE, normalizeSfx, type Sound } from './sfx';
 import { normalizeStage, type StageSettings } from './stage-settings';
 
 export const CART_FORMAT = 'stitch-cart' as const;
-export const CART_VERSION = 5 as const;
+export const CART_VERSION = 7 as const;
 
 /** Initial state of one sprite. Positions are cart-space floats. */
 export interface SpriteInit {
@@ -83,6 +83,10 @@ export interface CartV4 {
   stage: StageSettings;
   project: Project;
   sprites: SpriteInit[];
+  /** The stage's costumes (asset ids, in order), drawn over the background colour. */
+  backdrops: string[];
+  /** 1-based, like `backdrop_number`. */
+  backdrop: number;
   /** Colours for palette indices 1..n; index 0 is transparent. */
   palette: string[];
   assets: Record<string, Asset>;
@@ -122,6 +126,9 @@ export function normalizeCart(input: unknown): Cart {
   if (c.version === 3) c = { ...c, version: 4, extensions: [] };
   // v5 added stage.cloneLimit, which normalizeStage fills in.
   if (c.version === 4) c = { ...c, version: 5 };
+  if (c.version === 5) c = { ...c, version: 6, backdrops: [], backdrop: 1 };
+  // v7 added recorded sounds (`kind: 'sample'`); older carts only have sfx.
+  if (c.version === 6) c = { ...c, version: 7 };
   const meta = (c.meta ?? {}) as { title?: unknown; author?: unknown };
   const cart: Cart = {
     format: CART_FORMAT,
@@ -135,6 +142,11 @@ export function normalizeCart(input: unknown): Cart {
     sprites: Array.isArray(c.sprites)
       ? (c.sprites as Partial<SpriteInit>[]).map(normalizeSprite)
       : [],
+    backdrops:
+      Array.isArray(c.backdrops) && c.backdrops.every((b) => typeof b === 'string')
+        ? (c.backdrops as string[])
+        : [],
+    backdrop: typeof c.backdrop === 'number' && c.backdrop >= 1 ? Math.floor(c.backdrop) : 1,
     palette:
       Array.isArray(c.palette) && c.palette.every((p) => typeof p === 'string')
         ? (c.palette as string[])
@@ -165,12 +177,15 @@ function normalizeExtensions(input: unknown): CartExtension[] {
 function normalizeSounds(input: unknown): Record<string, Sound> {
   const out: Record<string, Sound> = {};
   if (!input || typeof input !== 'object') return out;
-  for (const [id, s] of Object.entries(input as Record<string, Partial<Sound>>))
-    out[id] = {
-      kind: 'sfx',
-      name: typeof s.name === 'string' ? s.name : id,
-      params: normalizeSfx(s.params),
-    };
+  for (const [id, raw] of Object.entries(input as Record<string, Record<string, unknown>>)) {
+    const name = typeof raw.name === 'string' ? raw.name : id;
+    if (raw.kind === 'sample') {
+      const rate = typeof raw.rate === 'number' ? Math.round(raw.rate) : 0;
+      // A recording with a bad rate or no data can't be played, so it's dropped.
+      if (rate < 1 || rate > MAX_SAMPLE_RATE || typeof raw.data !== 'string') continue;
+      out[id] = { kind: 'sample', name, rate, data: raw.data };
+    } else out[id] = { kind: 'sfx', name, params: normalizeSfx(raw.params) };
+  }
   return out;
 }
 

@@ -27,10 +27,12 @@ pnpm install
 pnpm dev
 ```
 
-Open `http://localhost:5173`. The editor starts with a sample game: press **Run** and use the arrow keys. **Cart → Samples** has bigger ones, with comments throughout for reading: **Stitch Dungeon**, a roguelike with procedurally generated floors, enemies as clones and a pen-drawn HUD and minimap; **Patch Hop**, a three-level platformer with tile collisions and stomping; and **Needle Storm**, a bullet hell against a three-phase boss. Then follow a tutorial:
+Open `http://localhost:5173`. The editor starts with a sample game: press **Run** and use the arrow keys. **Cart → Samples** has bigger ones, with comments throughout for reading: **Stitch Dungeon**, a roguelike with procedurally generated floors, enemies as clones and a pen-drawn HUD and minimap; **Patch Hop**, a three-level platformer with tile collisions and stomping; and **Needle Storm**, a bullet hell against a three-phase boss. **Scratch Parity** checks Scratch 3 blocks one by one and prints PASS or FAIL for each. Then follow a tutorial:
 
 - [Your first game, for Scratch users](docs/tutorials/first-game-scratch.md): blocks first.
 - [Your first game, for PICO-8 users](docs/tutorials/first-game-pico8.md): text first, with a tile map.
+
+Have a Scratch project? Open the `.sb3` with **Cart → Open file…** ([importing Scratch projects](docs/import-scratch.md)).
 
 `pnpm build` writes a static site to `packages/editor/dist`, which any static host can serve ([hosting notes](docs/export.md#hosting-the-editor)).
 
@@ -39,6 +41,7 @@ Open `http://localhost:5173`. The editor starts with a sample game: press **Run*
 | | |
 |---|---|
 | [Language reference](docs/reference.md) | Every keyword, block and builtin, text and blocks side by side |
+| [Importing Scratch projects](docs/import-scratch.md) | Opening `.sb3` files: what comes across and what doesn't |
 | [Exporting and sharing](docs/export.md) | HTML, web app and desktop exports; CORS and secrets |
 | [Network, secrets and CORS](docs/network.md) | How HTTP from games works, and the threat model |
 | [Writing an extension](docs/extensions.md) | Add your own blocks |

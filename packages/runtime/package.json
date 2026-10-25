@@ -11,6 +11,7 @@
     "./protocol": "./src/protocol.ts",
     "./stats": "./src/stats.ts",
     "./fetch-net": "./src/web/fetch-net.ts",
+    "./mic": "./src/web/mic.ts",
     "./runner": "./src/runner.ts",
     "./extensions": "./src/core/extensions.ts"
   },

@@ -12,13 +12,15 @@ Architecture rules, stack and conventions are in [`CLAUDE.md`](../CLAUDE.md). De
 | 4     | Audio                      | ✅ Done                   |
 | 5     | APIs and extensions        | ✅ Done                   |
 | 6     | Export                     | ✅ Done                   |
-| 7     | Visual design and branding | ✅ Done (awaiting review) |
-| 8     | Documentation              | ✅ Done (awaiting review) |
-| 9     | Block parity with Scratch 3 | ✅ Done (awaiting review) |
-| 10    | Sample game: Stitch Dungeon | ✅ Done (awaiting review) |
-| 11    | Code editor tooling        | ✅ Done (awaiting review) |
-| 12    | Sample games: Patch Hop and Needle Storm | ✅ Done (awaiting review) |
-| 13    | Editor chrome: docs, icons, pause, full screen | ✅ Done (awaiting review) |
+| 7     | Visual design and branding | ✅ Done                   |
+| 8     | Documentation              | ✅ Done                   |
+| 9     | Block parity with Scratch 3 | ✅ Done                   |
+| 10    | Sample game: Stitch Dungeon | ✅ Done                   |
+| 11    | Code editor tooling        | ✅ Done                   |
+| 12    | Sample games: Patch Hop and Needle Storm | ✅ Done                   |
+| 13    | Editor chrome: docs, icons, pause, full screen | ✅ Done                   |
+| 14    | The rest of Scratch 3      | ✅ Done (awaiting review) |
+| 15    | Importing Scratch projects (.sb3) | ✅ Done (awaiting review) |
 
 **Performance targets:** 1,000 moving sprites at 60 fps on a mid-range laptop. Editor first load under 2 s on broadband. Runtime-only export bundle under 500 KB gzipped (172 KB at Phase 6, enforced in CI).
 
@@ -343,11 +345,11 @@ Delivered:
   - WebGPU passed with p95 18.0 ms, and the sandboxed stage passed.
   - `bench.html?clones=1` makes the 999 balls with `create_clone`: 60 fps, p95 17.4–18.0 ms.
 
-Deferred (with reasons in the audit):
+Deferred at the time, all since done: `ask`/`answer` in Phase 11, and backdrops, sound effects, the four distortion effects, the clock, loudness, username and drag mode in [Phase 14](#phase-14--the-rest-of-scratch-3-).
 
-- backdrops and their hat (the stage has no costumes yet);
+- backdrops and their hat (the stage had no costumes yet);
 - the sound pitch and pan effects;
-- `ask`/`answer` (needs a text-input overlay in the stage and players);
+- `ask`/`answer` (needed a text-input overlay in the stage and players);
 - wall-clock date and time (breaks D4's determinism);
 - the fisheye, whirl, pixelate and mosaic effects (shader cost at 1,000 sprites);
 - loudness, username and drag mode.
@@ -497,9 +499,88 @@ Known gaps:
 - The docs page renders the architecture page's Mermaid diagram as code.
 - Docs pages reload on each link (no client-side routing).
 
+## Phase 14 — The rest of Scratch 3 ✅
+
+A second audit of every Scratch 3 block (plus Pen) against the catalog found ten gaps left after Phase 9. All are closed; the catalog went from 154 builtins to 176.
+
+| # | Scratch block(s) | Stitch |
+|---|---|---|
+| G1 | glide to random / mouse / sprite | `glide_to(seconds, sprite)` |
+| G2 | letter _ of _ | `letter_of(i, text)` |
+| G3 | (size) of (sprite) | `size_of(sprite)` |
+| G4 | when (timer / loudness) > _ | `on timer > n` and `on loudness > n` hats |
+| G5 | set pen (color) to, change/set pen saturation and brightness | `set_pen_hue`, `set_/change_pen_saturation`, `set_/change_pen_brightness` |
+| G6 | hide variable / hide list | `unwatch(label)` |
+| G7 | switch backdrop (and wait), next backdrop, backdrop # / name, when backdrop switches to | `backdrop`, `backdrop_wait`, `next_backdrop`, `backdrop_number`, `backdrop_name`, `on backdrop "b"` |
+| G8 | sound effects pitch and pan, clear sound effects | `set_sound_effect`, `change_sound_effect`, `clear_sound_effects` |
+| G9 | fisheye, whirl, pixelate, mosaic | new names for `set_effect` / `change_effect` |
+| G10 | current (year…second), days since 2000, loudness, username, set drag mode | `current(unit)`, `days_since_2000()`, `loudness()`, `username()`, `set_drag_mode(draggable)` |
+
+Delivered:
+
+- **Language** (`IR_VERSION` 3; older projects load unchanged): `on timer > n`, `on loudness > n` (one `greater` event) and `on backdrop "b"`. Edge-triggered hats fire once each time the value rises past `n`, without restarting a run that's still going (`Scheduler.checkEdges`).
+- **Backdrops** (`CART_VERSION` 6, `PROTOCOL_VERSION` 5, `GAME_VERSION` 3):
+  - `cart.backdrops` and `cart.backdrop`. The stage sprite carries them as its costumes, centred on the stage, so switching, drawing, the cover picture and colour sensing reuse the costume code (D27 updated: colour sensing now sees the backdrop).
+  - The renderer draws the backdrop between the background colour and the map.
+  - The Costumes tab edits backdrops when the Stage file is selected; new pixel and vector backdrops are stage-sized.
+  - `"next backdrop"`, `"previous backdrop"` and `"random backdrop"` as in Scratch's menu; the name is completed and linted (`ref: 'backdrop'`).
+- **Effects:**
+  - Sound: per-sprite pitch and pan, applied to the sprite's playing sounds too. `play_sound`/`play_sound_wait` now take the sprite; Web Audio uses the playback rate (`2^(pitch/120)`) and a `StereoPannerNode` only for panned voices. `play_sound_wait` waits the pitched length.
+  - Graphic: fisheye, whirl, pixelate and mosaic with scratch-render's uniforms and `EffectTransform` maths (`core/effects.ts`). Instead of shaders, the renderer draws a distorted copy of the costume from the same CPU function pixel touching uses, made only when the costume or the values change. So drawing and touching always agree, on WebGL and WebGPU alike, and sprites without these effects cost nothing (the 1,000-sprite benchmark never touches it).
+- **Real-world sensing:**
+  - `current(unit)` and `days_since_2000()` read a wall-clock sample taken at the start of each tick (`WorldOptions.clock`, D33).
+  - `loudness()`: the editor asks before opening the microphone, only for a cart whose code uses loudness, and sends the level (Scratch's smoothing and curve, `micLevel`) to the stage each frame with a new `loudness` message; players open the microphone in their own page after the start click (`@stitch/runtime/mic`, D34). -1 without a microphone.
+  - `username()` is `""`, Scratch's value when signed out.
+  - `set_drag_mode`: pressing a draggable sprite drags it with the pointer and brings it to the front, in the editor and players alike (D35).
+- **Sample:** **Scratch Parity** (`?sample=parity`): a Checker sprite runs 36 checks of Scratch behaviour (operators, lists, motion, backdrops and their hats, clones, sensing, the timer hat) and prints PASS or FAIL for each, with totals on stage; then a demo of backdrops, the distortion effects, sound effects, drag mode, the pen's colour controls and the clock. `parity.test.ts` runs it and wants no FAIL.
+- **`stamp`** now draws the sprite's colour, brightness and distortion effects too (the stamp op carries the effects; the renderer makes the bent texture and colour filter for that one stamp).
+- **Benchmark** (M2, headless Chromium, 1,000 sprites): WebGL 60.0 fps, p95 17.8 ms; sandboxed WebGL 60 fps; WebGPU 60 fps with p95 18.3, 18.2 and 17.9 ms over three runs, the same headless frame-pacing noise as Phase 9 (about 2 ms of work per frame).
+- **Tests:** 12 new compiled-behaviour tests in `parity.test.ts`, unit tests for the distortion maths, pitch and loudness (`effects.test.ts`) and the cart v6 migration, and WebGL pixel tests for the backdrop mosaic and stamped effects (`backdrop.browser.test.ts`). The player is 188.1 KB gzipped.
+
+Known gaps:
+
+- Distorted costumes are sampled nearest-neighbour (as touching is), where Scratch smooths non-pixel-art costumes on the GPU.
+- The editor keeps the microphone open until Stop, not just while scripts run: an `on loudness >` or `on key` hat can start one at any time.
+
+## Phase 15 — Importing Scratch projects (.sb3) ✅
+
+Opening a Scratch 3 project gives an ordinary cart: sprites, stage, costumes, backdrops, sounds, variables, lists, custom blocks and scripts, as canonical Stitch code. What maps to what is in [`import-scratch.md`](import-scratch.md).
+
+Delivered:
+
+- **Recorded sounds** (`CART_VERSION` 7): a sound is now `kind: 'sfx'` or `kind: 'sample'` (mono 16-bit PCM, base64, at most 48 kHz). `soundPcm` in `@stitch/cart/audio` gives either kind as samples at its own rate. The stage, players, export and the tracker's sample instruments all go through it, so recordings also work as instruments. `@stitch/cart` gained pure WAV decoding (PCM 8/16/24/32-bit, float and IMA ADPCM, which Scratch records and browsers can't decode) and resampling. In the Sounds tab, a recording shows its waveform and rate, with play, rename, export WAV and delete. `PROTOCOL_VERSION` and `GAME_VERSION` are unchanged, since clips already carried their rate.
+- **`@stitch/sb3`** (pure, editor-only, nothing added to the player):
+  - Unzips the project, then claims identifiers for every variable, list, custom block and input, so any script can refer to any of them.
+  - Converts each script to IR: one switch for statements and one for reporters, with menus, Scratch's compact primitives and covered shadows handled.
+  - Prints and re-parses the result, so an imported cart is exactly what the editor would hold.
+  - Merges sounds into one bank (D36) and keeps Scratch comments, visible monitors (as `watch` loops), drag mode and rotation style.
+  - `HANDLED` covers every Scratch 3 core and Pen opcode except 18 hidden or Scratch 2 ones. Those are listed with reasons in `opcodes.test.ts` and the docs.
+  - Anything else becomes a `-- sb3: <opcode>` comment in place and is counted in the report.
+- **Editor:** `cartFromBytes` sends zips to the importer. **Open file…**, drag and drop, and `?cart=` all accept `.sb3`. The editor supplies MP3 decoding (`OfflineAudioContext`) and the half-size scaling of Scratch's double-resolution bitmaps (`lib/scratch.ts`). A dialog after the import lists unsupported blocks, renames, skipped loose blocks and notes.
+- **Docs:** [`import-scratch.md`](import-scratch.md) (in the Docs sidebar), D36, cart format v7, and links from the README and the Scratch tutorial.
+- **Tests:** 13 importer tests:
+  - a hand-built project run on `World` (variables, lists, loops, a warp custom block, broadcast-and-wait and a clone give Scratch's values);
+  - canonical text;
+  - name rules;
+  - `var_of` across sprites;
+  - unsupported blocks becoming comments;
+  - comments, monitors, drag mode and menus;
+  - sound merging and costumes;
+  - a project using every mapped opcode, which validates and compiles.
+
+  Also unit tests for WAV/ADPCM decoding, resampling and `soundPcm`, a song using a recording as an instrument, and the cart v7 migration. Node tests: 582. The player is 188.3 KB gzipped.
+- **Real projects:** three `.sb3` games (19, 9 and 8 sprites; up to 665 costumes) import with zero validation errors and compile. One, an RPG, was checked end to end in the editor and runs. Its MP3 music decodes, it survives a save and reopen as `.stitch.png`, and its HTML export plays.
+
+Known gaps:
+
+- Recordings are stored as plain PCM, so a cart with long music is large: the RPG's 111-second theme at 48 kHz makes a 13 MB cart. Storing at 22.05 kHz, or keeping the MP3 bytes and decoding them in players, would shrink it.
+- Hats fired in a tick start on the next one (D6). So a project that creates a clone, waits 0 and then changes a variable the clone reads can behave differently; the RPG's HP counter is one example.
+- SVG costumes that use Scratch's own fonts fall back to browser fonts.
+- Extensions other than Pen (Music, Text to Speech, Translate, Video Sensing, TurboWarp's) aren't converted.
+
 ## Open decisions (owner)
 
-1. Approve the Scratch departures D1–D32 in `departures.md` (D32, `ask`'s answer field and `frame_count`, is new in Phase 11). D24–D31 are new in Phase 9: pen shapes and layer, the clone-limit error, `shared var`, CPU-only colour sensing, fixed `delta_time`, `watch` monitors, `break`/`continue`/dictionaries and the pixel font. D21 changed: JSON objects now become dictionaries.
+1. Approve the Scratch departures D1–D36 in `departures.md` (D36, merging each sprite's sounds into the cart's bank on import, is new in Phase 15; D33–D35, the clock sampled per tick, the editor-proxied microphone and drag mode everywhere, are new in Phase 14; D32, `ask`'s answer field and `frame_count`, in Phase 11). D24–D31 are new in Phase 9: pen shapes and layer, the clone-limit error, `shared var`, CPU-only colour sensing, fixed `delta_time`, `watch` monitors, `break`/`continue`/dictionaries and the pixel font. D21 changed: JSON objects now become dictionaries.
 2. License approvals:
    - dev-only exceptions `lightningcss` (MPL-2.0), `minimatch` (BlueOak-1.0.0) and `argparse` (Python-2.0, via TypeDoc for the API docs)
    - `idb` (ISC), or keep the in-house wrapper
@@ -518,16 +599,14 @@ Known gaps:
 - Songs render on the editor's main thread when the stage reloads (cached per source). Long songs can stall a reload briefly; a Worker would fix that.
 - Previews in the tracker play once, even for looping songs.
 - Deleting or renaming a sound isn't in the effect editor's undo history.
-- No recorded or imported samples yet (`Sound.kind` is always `sfx`); WAV import would add `kind: 'pcm'`.
+- Recorded sounds can only come from a Scratch import; the Sounds tab can't import a WAV or MP3 on its own or edit a recording beyond renaming.
 - A host prompt can appear after Stop for a request made just before it.
 - The stage CSP applies only to builds; under `pnpm dev` the stage can still fetch.
 - Extension code shares the stage window: it can't reach the editor, secrets or the `World`, but it can post spoofed `log`/`error` messages or draw over the stage. HTTP it sends still goes through the host prompt and secret host rules.
 - Extension blocks are plain commands and reporters: no hats, dropdown menus or custom shapes yet.
-- Phases 3–8 aren't committed yet (the last commit is Phase 2).
 - The Tauri template and desktop editor have never been compiled (no Rust toolchain here). Unverified: that the HTTP plugin's `fetch` handles the player's `AbortSignal` and streamed body as expected, and that the editor's sandboxed stage iframe works under the `tauri://` origin.
 - Exported players render songs on the main thread at start-up (behind "Loading…"), as the editor does on reload.
-- The CI workflow hasn't run yet: the repository has no remote.
+- CI runs on GitHub (`Shadow1363/stitch`), but the latest runs on `main` fail.
 - `touching_color` doesn't see the pen layer (D27).
 - Costume pixels for touching are decoded on first use, so the first touching test against a large costume costs a few milliseconds.
-- `stamp` draws the costume without its colour or brightness effects (ghost applies).
 - The p95 frame-time bar (≤ 18 ms) is at the level of headless Chromium's own frame-pacing noise on the M2, so single runs can fail it while doing under 2 ms of work per frame. A run on real hardware with vsync would be a better judge.

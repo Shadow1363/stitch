@@ -26,12 +26,16 @@ ParamList { "(" commaSep<Name> ")" }
 
 EventScript { kw<"on"> event kw<"do"> Body kw<"end"> }
 
-event { StartEvent | KeyEvent | MessageEvent | CloneEvent | ClickEvent }
+event {
+  StartEvent | KeyEvent | MessageEvent | CloneEvent | ClickEvent | GreaterEvent | BackdropEvent
+}
 StartEvent { ckw<"start"> }
 CloneEvent { ckw<"clone"> }
 ClickEvent { ckw<"click"> }
 KeyEvent { ckw<"key"> String }
 MessageEvent { ckw<"message"> String }
+BackdropEvent { ckw<"backdrop"> String }
+GreaterEvent { (ckw<"timer"> | ckw<"loudness">) ">" Number }
 
 // `return`, `break` and `continue` may only end a block (as in Lua), which keeps `return` +
 // newline unambiguous and gives each its cap block.

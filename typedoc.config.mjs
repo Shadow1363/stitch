@@ -2,7 +2,7 @@
 // Entry points are every package's `exports`, so a new public module is documented automatically.
 import { readFileSync } from 'node:fs';
 
-const PACKAGES = ['ir', 'lang', 'compiler', 'runtime', 'cart', 'blocks', 'export'];
+const PACKAGES = ['ir', 'lang', 'compiler', 'runtime', 'cart', 'blocks', 'export', 'sb3'];
 
 const entryPoints = PACKAGES.flatMap((p) => {
   const { exports } = JSON.parse(readFileSync(`packages/${p}/package.json`, 'utf8'));

@@ -58,6 +58,9 @@ export async function startHost(container: HTMLElement = document.body): Promise
       case 'http-result':
         net.answer(m);
         return;
+      case 'loudness':
+        runner.setLoudness(m.level);
+        return;
     }
   });
 

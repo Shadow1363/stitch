@@ -23,6 +23,12 @@ export const text: DocSection = {
       alt: 'say letters 2 to 4 of hello',
     },
     {
+      id: 'letter_of',
+      doc: 'Letter `index` of `text`, counting from 1. `""` past either end.',
+      example: `say(letter_of(1, "apple"))`,
+      alt: 'say letter 1 of apple',
+    },
+    {
       id: 'upper',
       doc: 'The text in capitals.',
       example: `say(upper(name))`,

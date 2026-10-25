@@ -1,7 +1,10 @@
 import type { Sprite } from './sprite';
 
 export type ThreadGen = Generator<unknown, unknown, unknown>;
-export type EventType = 'start' | 'key' | 'message' | 'clone' | 'click';
+export type EventType =
+  'start' | 'key' | 'message' | 'clone' | 'click' | 'timer' | 'loudness' | 'backdrop';
+/** Events whose scripts start when a value rises above the script's threshold (`arg`). */
+export type EdgeEvent = 'timer' | 'loudness';
 
 export interface Script {
   sprite: Sprite;
@@ -36,6 +39,8 @@ export class Scheduler {
   private byEvent = new Map<string, Script[]>();
   /** Each script's most recent thread, so triggers don't search every thread. */
   private latest = new Map<Script, Thread>();
+  /** Timer and loudness scripts, with whether their value was above the threshold last tick. */
+  private edges: { script: Script; above: boolean }[] = [];
   threads: Thread[] = [];
   /** The thread being stepped, if any. */
   current: Thread | null = null;
@@ -43,6 +48,8 @@ export class Scheduler {
   constructor(private onError: (e: ThreadError) => void = () => {}) {}
 
   add(script: Script): void {
+    if (script.event === 'timer' || script.event === 'loudness')
+      this.edges.push({ script, above: false });
     const k = key(script.event, script.arg);
     const list = this.byEvent.get(k);
     if (list) list.push(script);
@@ -62,7 +69,20 @@ export class Scheduler {
       this.byEvent.set(k, keep);
       for (const s of list) if (s.sprite === sprite) this.latest.delete(s);
     }
+    this.edges = this.edges.filter((e) => e.script.sprite !== sprite);
     for (const t of this.threads) if (t.script.sprite === sprite) t.state = 'done';
+  }
+
+  /**
+   * Starts each timer or loudness script whose value has just gone above its threshold. As in
+   * Scratch, it fires once per crossing and doesn't restart a run that's still going.
+   */
+  checkEdges(value: (event: EdgeEvent) => number): void {
+    for (const e of this.edges) {
+      const above = value(e.script.event as EdgeEvent) > Number(e.script.arg);
+      if (above && !e.above) this.start(e.script, false);
+      e.above = above;
+    }
   }
 
   /** Ends every thread of `sprite` except `keep` (Scratch "stop other scripts in sprite"). */
@@ -79,21 +99,26 @@ export class Scheduler {
     const started: Thread[] = [];
     for (const script of this.byEvent.get(key(event, arg)) ?? []) {
       if (sprite && script.sprite !== sprite) continue;
-      const last = this.latest.get(script);
-      const existing = last && last.state !== 'done' ? last : undefined;
-      if (existing) {
-        if (!restart) continue;
-        existing.gen = script.body();
-        existing.state = 'pending';
-        started.push(existing);
-        continue;
-      }
-      const t: Thread = { script, gen: script.body(), state: 'pending' };
-      this.threads.push(t);
-      this.latest.set(script, t);
-      started.push(t);
+      const t = this.start(script, restart);
+      if (t) started.push(t);
     }
     return started;
+  }
+
+  /** Starts one script, or restarts its running thread when `restart`; undefined if left alone. */
+  private start(script: Script, restart: boolean): Thread | undefined {
+    const last = this.latest.get(script);
+    const existing = last && last.state !== 'done' ? last : undefined;
+    if (existing) {
+      if (!restart) return undefined;
+      existing.gen = script.body();
+      existing.state = 'pending';
+      return existing;
+    }
+    const t: Thread = { script, gen: script.body(), state: 'pending' };
+    this.threads.push(t);
+    this.latest.set(script, t);
+    return t;
   }
 
   step(): void {

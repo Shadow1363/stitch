@@ -2,7 +2,7 @@
  * Web Audio output for the stage. Sounds arrive as rendered samples (the editor renders them
  * from cart sources with @stitch/cart/audio), so nothing here synthesizes or fetches.
  */
-import type { AudioOut } from '../core/audio';
+import { pitchRate, type AudioOut, type Voice } from '../core/audio';
 import type { PcmClip } from '../protocol';
 
 /** Overlapping sounds beyond this stop the oldest, so a fast loop can't pile up voices. */
@@ -13,7 +13,8 @@ export class WebAudioOut implements AudioOut {
   private readonly master: GainNode;
   private buffers = new Map<string, AudioBuffer>();
   private songs = new Map<string, { buffer: AudioBuffer; loop: boolean }>();
-  private voices: AudioBufferSourceNode[] = [];
+  /** Playing sounds, with the sprite that plays them and its panner (when panned). */
+  private voices: { src: AudioBufferSourceNode; owner: string; pan?: StereoPannerNode }[] = [];
   private music: AudioBufferSourceNode | undefined;
 
   constructor() {
@@ -46,20 +47,43 @@ export class WebAudioOut implements AudioOut {
     return b;
   }
 
-  playSound(id: string): void {
+  playSound(id: string, voice?: Voice): void {
     const buffer = this.buffers.get(id);
     if (!buffer) return;
-    if (this.voices.length >= MAX_VOICES) this.voices.shift()?.stop();
+    if (this.voices.length >= MAX_VOICES) this.voices.shift()?.src.stop();
     const src = this.ctx.createBufferSource();
     src.buffer = buffer;
-    src.connect(this.master);
-    src.onended = () => (this.voices = this.voices.filter((v) => v !== src));
-    this.voices.push(src);
+    // Scratch's pitch effect changes the playback rate, so the sound also gets shorter.
+    src.playbackRate.value = pitchRate(voice?.pitch ?? 0);
+    const v: (typeof this.voices)[number] = { src, owner: voice?.owner ?? '' };
+    // A panner only for panned voices, so plain sounds keep the shortest path.
+    if (voice?.pan) {
+      v.pan = this.ctx.createStereoPanner();
+      v.pan.pan.value = voice.pan / 100;
+      src.connect(v.pan).connect(this.master);
+    } else src.connect(this.master);
+    src.onended = () => (this.voices = this.voices.filter((x) => x !== v));
+    this.voices.push(v);
     src.start();
   }
 
+  /** Scratch applies a sprite's new pitch and pan to the sounds it's already playing. */
+  setSoundEffects(owner: string, fx: { pitch: number; pan: number }): void {
+    const t = this.ctx.currentTime;
+    for (const v of this.voices) {
+      if (v.owner !== owner) continue;
+      v.src.playbackRate.setValueAtTime(pitchRate(fx.pitch), t);
+      if (!v.pan && fx.pan) {
+        v.pan = this.ctx.createStereoPanner();
+        v.src.disconnect();
+        v.src.connect(v.pan).connect(this.master);
+      }
+      v.pan?.pan.setValueAtTime(fx.pan / 100, t);
+    }
+  }
+
   stopSounds(): void {
-    for (const v of this.voices) v.stop();
+    for (const v of this.voices) v.src.stop();
     this.voices = [];
   }
 

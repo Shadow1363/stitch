@@ -196,6 +196,15 @@ function stringItems(call: CallSite | undefined, data: AssistData): Item[] {
       return words(REF_WORDS.effect, 'effect');
     case 'rotation':
       return words(REF_WORDS.rotation, 'rotation style');
+    case 'backdrop':
+      return [
+        ...words(names.backdrops ?? [], 'backdrop'),
+        ...words(REF_WORDS.backdrop, 'special backdrop'),
+      ];
+    case 'sound_effect':
+      return words(REF_WORDS.sound_effect, 'sound effect');
+    case 'time_unit':
+      return words(REF_WORDS.time_unit, 'unit');
   }
 }
 

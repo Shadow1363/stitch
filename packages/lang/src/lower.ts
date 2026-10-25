@@ -302,6 +302,15 @@ class Lowerer {
     if (n.getChild('StartEvent')) return { type: 'start' };
     if (n.getChild('CloneEvent')) return { type: 'clone' };
     if (n.getChild('ClickEvent')) return { type: 'click' };
+    const gt = n.getChild('GreaterEvent');
+    if (gt)
+      return {
+        type: 'greater',
+        what: gt.getChild('loudness') ? 'loudness' : 'timer',
+        value: Number(this.textOf(gt.getChild('Number')!)),
+      };
+    const bd = n.getChild('BackdropEvent');
+    if (bd) return { type: 'backdrop', name: this.str(bd.getChild('String')!) };
     const key = n.getChild('KeyEvent');
     if (key) return { type: 'key', key: this.str(key.getChild('String')!) };
     const msg = n.getChild('MessageEvent')!;

@@ -2,7 +2,7 @@
 
 A cart is one file holding a whole game: code, sprites, art, sounds, music, the tile map and extensions. It is JSON, usually stored inside a PNG whose picture is the game's cover (`.stitch.png`). Reading code: `packages/cart/src/cart.ts` (`normalizeCart`) and `packages/cart/src/png.ts`. This page is the spec; the code is the authority.
 
-Carts hold **sources, not caches**: pixel layers, SVG text and sound parameters rather than rendered images or audio. The editor, the stage and exported players all render them with the same code (`@stitch/cart/render`, `@stitch/cart/audio`).
+Carts hold **sources, not caches**: pixel layers, SVG text and sound parameters rather than rendered images or audio. The one exception is a recorded sound, whose source is the recording. The editor, the stage and exported players all render them with the same code (`@stitch/cart/render`, `@stitch/cart/audio`).
 
 ## The PNG container
 
@@ -17,7 +17,7 @@ Image viewers and most image tools ignore the chunk and show the cover: the stag
 
 ## Versions and migration
 
-The top level has `format: "stitch-cart"` and `version`. The current version is **5** (`CART_VERSION`). Loading runs `normalizeCart`, which rejects other formats and newer versions, migrates older ones one step at a time, and fills every missing field with its default. So a cart only needs the fields it uses.
+The top level has `format: "stitch-cart"` and `version`. The current version is **7** (`CART_VERSION`). Loading runs `normalizeCart`, which rejects other formats and newer versions, migrates older ones one step at a time, and fills every missing field with its default. So a cart only needs the fields it uses.
 
 | Version | Change |
 |---|---|
@@ -26,23 +26,27 @@ The top level has `format: "stitch-cart"` and `version`. The current version is 
 | 3 | `sounds` and `music` |
 | 4 | `extensions` |
 | 5 | `stage.cloneLimit` |
+| 6 | `backdrops` and `backdrop` |
+| 7 | Recorded sounds (`kind: "sample"`) |
 
-The program inside (`project`) has its own version, `irVersion` (currently 2: version 2 added `break`, `continue`, `shared var` and the clone and click events), migrated by `migrateProject` in `@stitch/ir`. Changing the shape of either bumps its version and adds a migration step, and old carts keep opening.
+The program inside (`project`) has its own version, `irVersion` (currently 3: version 2 added `break`, `continue`, `shared var` and the clone and click events; version 3 the timer, loudness and backdrop events), migrated by `migrateProject` in `@stitch/ir`. Changing the shape of either bumps its version and adds a migration step, and old carts keep opening.
 
 ## Top level
 
 | Field | Type | |
 |---|---|---|
 | `format` | `"stitch-cart"` | |
-| `version` | `5` | |
+| `version` | `7` | |
 | `meta` | object | `title` (default `"Untitled"`) and optional `author` |
 | `stage` | object | [Stage settings](#stage) |
 | `project` | object | The program: `irVersion`, the `stage` module and one module per sprite in `sprites` (`id`, `name`, `module`). Each module's `items` are the IR nodes in `packages/ir/src/nodes.ts`, the same tree the [language reference](reference.md) describes |
 | `sprites` | array | [Starting state of each sprite](#sprites) |
+| `backdrops` | array | The stage's costumes: asset ids, in order. Each is drawn with its centre on the stage's centre, over `stage.background` and under the map |
+| `backdrop` | `1` | The backdrop shown at Run, from 1 |
 | `palette` | array of `#rrggbb` | Colours for palette indices 1 and up; index 0 is transparent |
 | `assets` | object | [Costumes and tilesets](#assets) by id |
 | `map` | object, optional | [Tile map](#map) |
-| `sounds` | object | [Sound effects](#sounds) by id |
+| `sounds` | object | [Sound effects and recordings](#sounds) by id |
 | `music` | object | [Tracker music](#music) |
 | `extensions` | array | [Extensions](#extensions), in load order |
 | `editor` | object, optional | [Editor state](#editor-state), not needed to run |
@@ -99,7 +103,11 @@ The map is anchored at the stage's top-left corner, whatever the origin.
 
 ## Sounds
 
-`sounds` maps an id to `{ kind: "sfx", name, params }`. Scripts play a sound by `name` or by its number in this object's order. `params` is an sfxr parameter set (`SfxParams` in `packages/cart/src/sfx.ts`):
+`sounds` maps an id to a sound effect or a recording. Scripts play either kind by `name` or by its number in this object's order, and a `"sample"` [instrument](#music) can play either.
+
+A recording is `{ kind: "sample", name, rate, data }`. `rate` is samples per second, at most 48000. `data` is base64 mono 16-bit little-endian PCM, so players decode it without a codec. Recordings come from [Scratch imports](import-scratch.md). A recording whose `rate` is out of range, or that has no `data`, is dropped on load.
+
+A sound effect is `{ kind: "sfx", name, params }`, where `params` is an sfxr parameter set (`SfxParams` in `packages/cart/src/sfx.ts`):
 
 | Field | |
 |---|---|

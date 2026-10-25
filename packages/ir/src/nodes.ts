@@ -1,6 +1,6 @@
 import type { SpriteProp } from './props';
 
-export const IR_VERSION = 2 as const;
+export const IR_VERSION = 3 as const;
 
 /** Unique within a project. Ignored by `irEqual`; reassigned on every parse. */
 export type NodeId = string;
@@ -74,7 +74,11 @@ export type EventSpec =
   /** A clone of this sprite has just been made; runs in the clone. */
   | { type: 'clone' }
   /** The sprite was clicked on stage. */
-  | { type: 'click' };
+  | { type: 'click' }
+  /** The timer or loudness has just risen above `value` (Scratch's edge-triggered hat). */
+  | { type: 'greater'; what: 'timer' | 'loudness'; value: number }
+  /** The stage has just switched to the named backdrop. */
+  | { type: 'backdrop'; name: string };
 
 export interface Block {
   stmts: Stmt[];

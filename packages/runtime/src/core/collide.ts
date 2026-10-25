@@ -1,4 +1,5 @@
 import { pose, stageBounds, type Rect } from './bounds';
+import { distortion, transformPoint } from './effects';
 import type { Space } from './space';
 import type { CostumeInfo, Sprite } from './sprite';
 import type { MapState } from './world';
@@ -22,10 +23,17 @@ function costumePixel(s: Sprite, c: CostumeInfo, space: Space, px: number, py: n
   let u = (dx * cos + dy * sin) / k;
   const v = (-dx * sin + dy * cos) / k;
   if (flip) u = -u;
-  const cx = Math.floor(u + c.center[0]);
-  const cy = Math.floor(v + c.center[1]);
-  if (cx < 0 || cy < 0 || cx >= c.width || cy >= c.height) return undefined;
-  return cy * c.width + cx;
+  let fx = u + c.center[0];
+  let fy = v + c.center[1];
+  if (fx < 0 || fy < 0 || fx >= c.width || fy >= c.height) return undefined;
+  const d = distortion(s.effects);
+  if (d) {
+    [fx, fy] = transformPoint(d, fx / c.width, fy / c.height, c.width, c.height);
+    fx *= c.width;
+    fy *= c.height;
+    if (fx < 0 || fy < 0 || fx >= c.width || fy >= c.height) return undefined;
+  }
+  return Math.floor(fy) * c.width + Math.floor(fx);
 }
 
 /** RGBA at a stage pixel of a sprite, or undefined where the sprite is transparent. */
@@ -93,6 +101,8 @@ export interface Backdrop {
   drawList: readonly Sprite[];
   map: MapState | undefined;
   tileset: CostumeInfo | undefined;
+  /** Its costume is the backdrop, under the map. */
+  stage?: Sprite;
   /** Stage background, 0xRRGGBB. */
   background: number;
 }
@@ -131,6 +141,10 @@ export function colorBelow(
           return (d[i * 4]! << 16) | (d[i * 4 + 1]! << 8) | d[i * 4 + 2]!;
       }
     }
+  }
+  if (bg.stage) {
+    const c = spriteColor(bg.stage, space, px, py);
+    if (c !== undefined) return c;
   }
   return bg.background;
 }

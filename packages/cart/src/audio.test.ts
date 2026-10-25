@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { encodeWav, MUSIC_RATE, renderSfx, renderSong, SFX_RATE, sfxSeconds } from './audio';
+import {
+  encodeWav,
+  MUSIC_RATE,
+  renderSfx,
+  renderSong,
+  SFX_RATE,
+  sfxSeconds,
+  soundPcm,
+} from './audio';
 import { emptyMusic, emptyPattern, NOTE_OFF, starterInstruments, type Music } from './music';
+import { sampleSound } from './sample';
 import {
   DEFAULT_SFX,
   SFX_PARAMS,
@@ -94,6 +103,21 @@ function tune(): Music {
   return m;
 }
 
+describe('soundPcm', () => {
+  it('renders sound effects at the sfxr rate', () => {
+    const p = sfxPreset('coin', 1);
+    const pcm = soundPcm({ kind: 'sfx', name: 'c', params: p });
+    expect(pcm.rate).toBe(SFX_RATE);
+    expect(hash(pcm.samples)).toBe(hash(renderSfx(p)));
+  });
+
+  it('decodes recordings at their own rate', () => {
+    const pcm = soundPcm(sampleSound('r', Float32Array.of(0, 0.5, -0.5), 16000));
+    expect(pcm.rate).toBe(16000);
+    expect([...pcm.samples].map((v) => Math.round(v * 100) / 100)).toEqual([0, 0.5, -0.5]);
+  });
+});
+
 describe('song renderer', () => {
   it('is deterministic', () => {
     const m = tune();
@@ -137,5 +161,17 @@ describe('song renderer', () => {
     const sounds = { snd: { kind: 'sfx' as const, name: 'snd', params: sfxPreset('coin', 1) } };
     const withSample = renderSong(m, m.songs.s1!, sounds);
     expect(hash(withSample)).not.toBe(hash(silent));
+  });
+
+  it('plays recorded sounds as instruments at their own rate', () => {
+    const m = tune();
+    m.instruments.i5 = { ...m.instruments.i1!, wave: 'sample', sound: 'rec', release: 0 };
+    m.patterns.p1!.cells[0]![0] = { note: 60, inst: 'i5' };
+    // A 100 ms tone at half the music rate still lasts 100 ms at C-4.
+    const tone = Float32Array.from({ length: 2205 }, (_, i) => Math.sin(i / 3) * 0.5);
+    const out = renderSong(m, m.songs.s1!, { rec: sampleSound('rec', tone, 22050) });
+    let last = 0;
+    for (let i = 0; i < MUSIC_RATE / 4; i++) if (out[i] !== 0) last = i;
+    expect(last / MUSIC_RATE).toBeCloseTo(0.1, 2);
   });
 });

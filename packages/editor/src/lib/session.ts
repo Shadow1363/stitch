@@ -30,6 +30,10 @@ export class Session {
   meta: Cart['meta'];
   stage: StageSettings;
   sprites: SpriteInit[];
+  /** Asset ids of the stage's backdrops, in order. */
+  backdrops: string[];
+  /** 1-based backdrop shown at Run. */
+  backdrop: number;
   palette: string[];
   assets: Record<string, Asset>;
   map: TileMap | undefined;
@@ -46,6 +50,8 @@ export class Session {
     this.meta = c.meta;
     this.stage = c.stage;
     this.sprites = c.sprites;
+    this.backdrops = c.backdrops;
+    this.backdrop = c.backdrop;
     this.palette = c.palette;
     this.assets = c.assets;
     this.map = c.map;
@@ -92,6 +98,8 @@ export class Session {
         meta: cart.meta,
         stage: cart.stage,
         sprites: cart.sprites,
+        backdrops: cart.backdrops,
+        backdrop: cart.backdrop,
         palette: cart.palette,
         assets: cart.assets,
         sounds: cart.sounds,
@@ -107,9 +115,17 @@ export class Session {
   static fromSources(
     parts: Omit<
       Cart,
-      'format' | 'version' | 'project' | 'editor' | 'sounds' | 'music' | 'extensions'
+      | 'format'
+      | 'version'
+      | 'project'
+      | 'editor'
+      | 'sounds'
+      | 'music'
+      | 'extensions'
+      | 'backdrops'
+      | 'backdrop'
     > &
-      Partial<Pick<Cart, 'sounds' | 'music' | 'extensions'>>,
+      Partial<Pick<Cart, 'sounds' | 'music' | 'extensions' | 'backdrops' | 'backdrop'>>,
     sources: Record<string, string>,
   ): Session {
     const docs = [new SourceDoc(STAGE_FILE, 'Stage', sources[STAGE_FILE] ?? STAGE_TEMPLATE)];
@@ -120,6 +136,8 @@ export class Session {
         map: undefined,
         sounds: parts.sounds ?? {},
         extensions: parts.extensions ?? [],
+        backdrops: parts.backdrops ?? [],
+        backdrop: parts.backdrop ?? 1,
       }),
       music: normalizeMusic(structuredClone(parts.music)),
       map: parts.map ? { ...parts.map } : undefined,
@@ -132,6 +150,8 @@ export class Session {
       meta: { title: 'Untitled' },
       stage: normalizeStage({}),
       sprites: [],
+      backdrops: [],
+      backdrop: 1,
       palette: DEFAULT_PALETTE.slice(),
       assets: {},
       map: undefined,
@@ -164,6 +184,8 @@ export class Session {
         })),
       },
       sprites: structuredClone(this.sprites),
+      backdrops: this.backdrops.slice(),
+      backdrop: this.backdrop,
       palette: this.palette.slice(),
       assets: structuredClone(this.assets),
       sounds: structuredClone(this.sounds),
@@ -184,6 +206,7 @@ export class Session {
         this.sprites.map((s) => [s.name, s.costumes.map(assetName).filter((n) => n !== undefined)]),
       ),
       sounds: Object.values(this.sounds).map((s) => s.name),
+      backdrops: this.backdrops.map(assetName).filter((n) => n !== undefined),
       songs: Object.values(this.music.songs).map((s) => s.name),
     };
   }
@@ -260,7 +283,10 @@ export class Session {
 
   /** Removes an asset nothing refers to any more (no costume list, not the map tileset). */
   dropAssetIfUnused(id: string): void {
-    const used = this.sprites.some((s) => s.costumes.includes(id)) || this.map?.tileset === id;
+    const used =
+      this.sprites.some((s) => s.costumes.includes(id)) ||
+      this.backdrops.includes(id) ||
+      this.map?.tileset === id;
     if (!used) delete this.assets[id];
   }
 }

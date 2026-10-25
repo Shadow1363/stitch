@@ -222,7 +222,7 @@ const INSTRUMENT: Required<Instrument> = {
 };
 const CART: Required<Cart> = {
   format: 'stitch-cart',
-  version: 5,
+  version: 7,
   meta: { title: 't', author: 'a' },
   stage: {
     width: 480,
@@ -239,6 +239,8 @@ const CART: Required<Cart> = {
     sprites: [{ id: 's', name: 'S', module: { items: [] } }],
   },
   sprites: [SPRITE],
+  backdrops: ['a'],
+  backdrop: 1,
   palette: [],
   assets: {
     a: PNG,
@@ -253,7 +255,10 @@ const CART: Required<Cart> = {
     c: { kind: 'svg', name: 'c', center: [0, 0], svg: '' },
   },
   map: { tileset: 'b', tileSize: 16, width: 1, height: 1, tiles: '' },
-  sounds: { s: { kind: 'sfx', name: 's', params: { ...DEFAULT_SFX } } },
+  sounds: {
+    s: { kind: 'sfx', name: 's', params: { ...DEFAULT_SFX } },
+    r: { kind: 'sample', name: 'r', rate: 22050, data: '' },
+  },
   music: {
     channels: 4,
     instruments: { i: INSTRUMENT },

@@ -169,10 +169,14 @@ class ModuleEmitter {
       const arg =
         ev.type === 'key'
           ? JSON.stringify(ev.key.toLowerCase())
-          : ev.type === 'message'
+          : ev.type === 'message' || ev.type === 'backdrop'
             ? JSON.stringify(ev.name)
-            : 'null';
-      w.line(`rt.on(S, ${JSON.stringify(ev.type)}, ${arg}, function* () {`, it.id);
+            : ev.type === 'greater'
+              ? JSON.stringify(String(ev.value))
+              : 'null';
+      // The timer and loudness hats register under their own event, with the threshold as arg.
+      const type = ev.type === 'greater' ? ev.what : ev.type;
+      w.line(`rt.on(S, ${JSON.stringify(type)}, ${arg}, function* () {`, it.id);
       this.block(it.body);
       w.line('});');
     }

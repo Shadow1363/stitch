@@ -1,5 +1,6 @@
 import {
   Application,
+  BufferImageSource,
   ColorMatrixFilter,
   Container,
   Graphics,
@@ -10,9 +11,10 @@ import {
   Texture,
 } from 'pixi.js';
 import { stageBounds } from '../core/bounds';
+import { distortion, distortionKey, distortPixels } from '../core/effects';
 import { ADVANCE, glyph, LINE_HEIGHT, type PenOp } from '../core/pen';
 import { LETTERBOX, type Renderer, type RenderView } from '../core/renderer';
-import type { Effects, Sprite } from '../core/sprite';
+import type { CostumeInfo, Effects, Sprite } from '../core/sprite';
 import type { MapState } from '../core/world';
 import { displayTransform } from './transform';
 
@@ -31,6 +33,29 @@ function drawOp(g: Graphics, op: Exclude<PenOp, { kind: 'clear' | 'stamp' }>) {
   else g.circle(op.x, op.y, op.r);
   if (op.line) g.stroke({ ...ink, width: op.line });
   else g.fill(ink);
+}
+
+/** Scratch: colour 200 is a full turn of hue; brightness adds to every channel. */
+function setColorMatrix(f: ColorMatrixFilter, e: Effects) {
+  f.reset();
+  if (e.color) f.hue((e.color / 200) * 360, false);
+  if (e.brightness) {
+    const m = f.matrix;
+    const b = e.brightness / 100;
+    for (const i of [4, 9, 14]) m[i] = (m[i] ?? 0) + b;
+    f.matrix = m;
+  }
+}
+
+/** A texture from RGBA the size of `like`, filtered the same way. */
+function pixelTexture(data: Uint8ClampedArray, like: Texture): Texture {
+  const source = new BufferImageSource({
+    resource: new Uint8Array(data.buffer),
+    width: like.width,
+    height: like.height,
+    scaleMode: like.source.scaleMode,
+  });
+  return new Texture({ source });
 }
 
 export type RendererPreference = 'webgpu' | 'webgl';
@@ -82,6 +107,10 @@ export class PixiRenderer implements Renderer {
   private bubblePool = new Map<Sprite, Bubble>();
   private textures = new Map<string, Texture>();
   private backdropKey = '';
+  /** The stage's costume (Scratch's backdrop), under the map. */
+  private backdropSprite = new PixiSprite();
+  /** Distorted copies of costumes (fisheye, whirl, pixelate, mosaic), one per sprite. */
+  private distorted = new Map<Sprite, { key: string; tex: Texture }>();
 
   private constructor(private opts: PixiRendererOptions) {}
 
@@ -101,7 +130,7 @@ export class PixiRenderer implements Renderer {
     opts.container.appendChild(r.app.canvas);
     r.app.stage.addChild(r.world);
     r.world.addChild(r.backdrop, r.clip, r.content, r.bubbles, r.watchLayer);
-    r.content.addChild(r.mapLayer, r.penSprite, r.layer);
+    r.content.addChild(r.backdropSprite, r.mapLayer, r.penSprite, r.layer);
     r.layer.sortableChildren = true;
     r.content.mask = r.clip;
     return r;
@@ -132,6 +161,7 @@ export class PixiRenderer implements Renderer {
       this.backdropKey = key;
     }
 
+    this.syncBackdrop(view);
     this.syncMap(view.map);
     this.syncPen(
       view,
@@ -143,7 +173,8 @@ export class PixiRenderer implements Renderer {
     for (const s of view.sprites) {
       if (s.isStage) continue;
       const costume = s.currentCostume;
-      const tex = costume && this.textures.get(costume.id);
+      const base = costume && this.textures.get(costume.id);
+      const tex = base && costume && this.costumeTexture(s, costume, base);
       let ps = this.pool.get(s);
       if (!tex || !costume) {
         if (ps) ps.visible = false;
@@ -174,6 +205,8 @@ export class PixiRenderer implements Renderer {
       this.pool.delete(s);
       this.filters.get(s)?.destroy();
       this.filters.delete(s);
+      this.distorted.get(s)?.tex.destroy(true);
+      this.distorted.delete(s);
     }
     for (const [s, b] of this.bubblePool) {
       if (seen.has(s)) continue;
@@ -182,6 +215,44 @@ export class PixiRenderer implements Renderer {
     }
     this.drawWatches(view);
     this.app.render();
+  }
+
+  /** The backdrop: the stage's costume, its centre on the stage's centre. */
+  private syncBackdrop(view: RenderView) {
+    const s = view.stage;
+    const c = s?.currentCostume;
+    const tex = c && this.textures.get(c.id);
+    const bs = this.backdropSprite;
+    bs.visible = !!(s && c && tex);
+    if (!s || !c || !tex) return;
+    if (bs.texture !== tex) bs.texture = tex;
+    const pixel = view.space.settings.scaling.filter === 'pixel' || c.pixelArt;
+    const t = displayTransform(s, c, view.space, pixel);
+    bs.anchor.set(t.anchorX, t.anchorY);
+    bs.position.set(t.x, t.y);
+  }
+
+  /**
+   * The costume's texture, or a distorted copy while fisheye, whirl, pixelate or mosaic is on.
+   * The copy comes from the same CPU maths as pixel touching, so both always agree; it is
+   * remade only when the costume or the effect values change.
+   */
+  private costumeTexture(s: Sprite, c: CostumeInfo, base: Texture): Texture {
+    const d = distortion(s.effects);
+    const cached = this.distorted.get(s);
+    if (!d || !c.pixels) {
+      if (cached) {
+        cached.tex.destroy(true);
+        this.distorted.delete(s);
+      }
+      return base;
+    }
+    const key = `${c.id}:${distortionKey(d)}`;
+    if (cached?.key === key) return cached.tex;
+    cached?.tex.destroy(true);
+    const tex = pixelTexture(distortPixels(c.pixels, c.width, c.height, d), base);
+    this.distorted.set(s, { key, tex });
+    return tex;
   }
 
   /** Colour and brightness need a filter; it's attached only while either is non-zero. */
@@ -197,15 +268,7 @@ export class PixiRenderer implements Renderer {
       f = new ColorMatrixFilter();
       this.filters.set(s, f);
     }
-    f.reset();
-    // Scratch: colour 200 is a full turn of hue; brightness adds to every channel.
-    if (e.color) f.hue((e.color / 200) * 360, false);
-    if (e.brightness) {
-      const m = f.matrix;
-      const b = e.brightness / 100;
-      for (const i of [4, 9, 14]) m[i] = (m[i] ?? 0) + b;
-      f.matrix = m;
-    }
+    setColorMatrix(f, e);
     if (!attached) ps.filters = [f];
   }
 
@@ -268,7 +331,18 @@ export class PixiRenderer implements Renderer {
       pixelArt: pixel,
     };
     const t = displayTransform(op.pose, info, view.space, pixel);
-    const ps = new PixiSprite(tex);
+    // Bent costumes come from the same CPU maths as live sprites; colour and brightness from
+    // the same matrix. Both are made for this one stamp and freed after it.
+    const d = distortion(op.effects);
+    const px = d && view.costumes?.[op.costume]?.pixels;
+    const bent =
+      d && px ? pixelTexture(distortPixels(px, tex.width, tex.height, d), tex) : undefined;
+    const ps = new PixiSprite(bent ?? tex);
+    const f = op.effects.color || op.effects.brightness ? new ColorMatrixFilter() : undefined;
+    if (f) {
+      setColorMatrix(f, op.effects);
+      ps.filters = [f];
+    }
     ps.anchor.set(t.anchorX, t.anchorY);
     ps.position.set(t.x, t.y);
     ps.rotation = t.rotation;
@@ -276,6 +350,8 @@ export class PixiRenderer implements Renderer {
     ps.alpha = op.alpha;
     this.app.renderer.render({ container: ps, target, clear: false });
     ps.destroy();
+    f?.destroy();
+    bent?.destroy(true);
   }
 
   /** `watch` monitors, top-left, in the pixel font so they read the same in every player. */
@@ -407,6 +483,11 @@ export class PixiRenderer implements Renderer {
     this.pool.clear();
     for (const b of this.bubblePool.values()) b.root.destroy({ children: true });
     this.bubblePool.clear();
+    for (const d of this.distorted.values()) d.tex.destroy(true);
+    this.distorted.clear();
+    // Its texture is about to be destroyed with the others.
+    this.backdropSprite.texture = Texture.EMPTY;
+    this.backdropSprite.visible = false;
   }
 
   destroy(): void {

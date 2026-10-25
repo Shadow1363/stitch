@@ -1,5 +1,6 @@
 import { bulletCart } from '../samples/bullet/build';
 import { examplesCart } from '../samples/examples/build';
+import { parityCart } from '../samples/parity/build';
 import { platformerCart } from '../samples/platformer/build';
 import { cartFromUrl } from './files';
 import { loadSample } from './project';
@@ -19,9 +20,9 @@ export interface Sample {
 
 /**
  * The samples in the Cart tab and `?sample=<id>`. Bounce is built from source and is the first
- * cart a new user sees; Examples is generated from the docs registry; Patch Hop and Needle Storm
- * are built from their `.stitch` code and the art and sound in their `build.ts`; Stitch Dungeon
- * is a cart made in the editor and saved as `.stitch.png`.
+ * cart a new user sees; Examples is generated from the docs registry; Patch Hop, Needle Storm
+ * and Scratch Parity are built from their `.stitch` code and the art and sound in their
+ * `build.ts`; Stitch Dungeon is a cart made in the editor and saved as `.stitch.png`.
  */
 export const SAMPLES: readonly Sample[] = [
   {
@@ -49,6 +50,12 @@ export const SAMPLES: readonly Sample[] = [
     build: () => fromBuilt(bulletCart()),
   },
   {
+    id: 'parity',
+    title: 'Scratch Parity',
+    about: 'Checks Scratch 3 blocks one by one, then demos backdrops, effects and drag',
+    build: () => fromBuilt(parityCart()),
+  },
+  {
     id: 'dungeon',
     title: 'Stitch Dungeon',
     about: 'A roguelike: clones, grids, pen HUD, line of sight',
@@ -74,5 +81,5 @@ export async function openSample(id: string): Promise<Session> {
   if (!s) throw new Error(`there's no sample called "${id}"`);
   if (s.build) return s.build();
   if (!s.path) throw new Error(`the sample "${id}" has no source`);
-  return Session.fromCart(await cartFromUrl(new URL(s.path, document.baseURI).href));
+  return Session.fromCart((await cartFromUrl(new URL(s.path, document.baseURI).href)).cart);
 }

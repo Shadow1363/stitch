@@ -1,6 +1,6 @@
 import type { PenOp } from './pen';
 import type { Space } from './space';
-import type { Sprite } from './sprite';
+import type { CostumeInfo, Sprite } from './sprite';
 import type { MapState } from './world';
 
 /**
@@ -13,6 +13,10 @@ export interface RenderView {
   readonly space: Space;
   /** Drawable sprites, back to front. */
   readonly sprites: readonly Sprite[];
+  /** Its current costume is the backdrop, drawn under the map. */
+  readonly stage?: Sprite;
+  /** Costume metadata by asset id, for stamps of distorted costumes (their pixels). */
+  readonly costumes?: Readonly<Record<string, CostumeInfo>>;
   readonly map?: MapState | undefined;
   /** Pen drawing since the last frame; a renderer takes it each frame. */
   readonly pen?: { take(): PenOp[] };

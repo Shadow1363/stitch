@@ -142,6 +142,8 @@ export function validateModule(
       switch (p.ref) {
         case 'effect':
         case 'rotation':
+        case 'sound_effect':
+        case 'time_unit':
           if (!words.includes(v))
             warn(
               `'${e.name}' takes one of ${words.map((w) => `"${w}"`).join(', ')}`,
@@ -162,6 +164,11 @@ export function validateModule(
         case 'costume': {
           const own = context.sprite !== undefined ? names.costumes[context.sprite] : undefined;
           if (own && !own.includes(v) && !isNumeric(v)) unknown('costume', own);
+          return;
+        }
+        case 'backdrop': {
+          const bs = names.backdrops;
+          if (bs && !bs.includes(v) && !words.includes(v) && !isNumeric(v)) unknown('backdrop', bs);
           return;
         }
         case 'sound':

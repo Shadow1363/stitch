@@ -5,6 +5,7 @@
  * asked once per host, with limits, and never with secrets.
  */
 import { FetchNet } from '@stitch/runtime/fetch-net';
+import { Microphone, streamLevel, usesLoudness } from '@stitch/runtime/mic';
 import { StageRunner } from '@stitch/runtime/runner';
 import { GAME_FORMAT, GAME_VERSION, type ExportedGame } from '../game';
 import { gamePayload } from '../payload';
@@ -47,6 +48,9 @@ async function main(): Promise<void> {
   loading.remove();
   if (!ok) return;
   await startScreen(game.title, game.author);
+  // Only a game that reads the loudness asks for the microphone, after the player's click (D34).
+  if (usesLoudness(game.code))
+    void Microphone.open().then((mic) => mic && streamLevel(mic, (l) => runner.setLoudness(l)));
   runner.run();
   restartButton(() => runner.run());
 }

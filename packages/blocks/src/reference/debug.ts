@@ -19,6 +19,12 @@ end`,
       alt: 'forever: watch score as score',
     },
     {
+      id: 'unwatch',
+      doc: 'Takes down the monitor that `watch` put up with this label, like hiding a variable in Scratch.',
+      example: `unwatch("score")`,
+      alt: 'stop watching score',
+    },
+    {
       id: 'assert',
       doc: 'Stops the script with an error when `condition` is false, pointing at this line. Use it to catch mistakes early.',
       example: `assert(hp >= 0, "hp went negative")`,

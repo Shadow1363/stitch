@@ -140,3 +140,4 @@ If something's wrong, **Problems** and the **Console** link to the line that cau
 - Make the player face where it's going with `point(90)` and `point(-90)`, and give it a second costume.
 - Show the score live with `say("Score: " .. score)` inside the player's loop.
 - Read the [language reference](../reference.md) for every block, and try the [PICO-8 tutorial](first-game-pico8.md) for the text side of Stitch.
+- Bring a game you made in Scratch: open its `.sb3` with **Open file…** and see it as Stitch code ([importing Scratch projects](../import-scratch.md)).

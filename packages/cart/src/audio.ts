@@ -1,5 +1,5 @@
 /**
- * Turns cart sound sources into samples: sfxr sound effects and tracker songs. Pure and
+ * Turns cart sound sources into samples: sfxr sound effects, recorded sounds and tracker songs. Pure and
  * deterministic (noise is seeded), so the editor, the stage and exported players all hear the
  * same thing and tests can compare buffers in Node.
  */
@@ -12,6 +12,7 @@ import {
   type Music,
   type Song,
 } from './music';
+import { decodePcm } from './sample';
 import { sfxRandom, type SfxParams, type Sound } from './sfx';
 
 /** sfxr's own rate; its parameters are tuned in samples at this rate. */
@@ -19,6 +20,13 @@ export const SFX_RATE = 44100;
 export const MUSIC_RATE = 44100;
 /** Longest song rendered, so a runaway order can't eat memory. */
 export const MAX_SONG_SECONDS = 180;
+
+/** A sound as mono samples at their own rate: rendered for sfx, decoded for recordings. */
+export function soundPcm(s: Sound): { rate: number; samples: Float32Array } {
+  return s.kind === 'sample'
+    ? { rate: s.rate, samples: decodePcm(s.data) }
+    : { rate: SFX_RATE, samples: renderSfx(s.params) };
+}
 
 /**
  * An independent implementation of the synth in DrPetter's sfxr (MIT): square/saw/sine/noise
@@ -231,14 +239,14 @@ export function renderSong(
   );
   const out = new Float32Array(total);
 
-  const samples = new Map<string, Float32Array>();
+  const samples = new Map<string, { rate: number; samples: Float32Array }>();
   const sampleFor = (id: string | undefined) => {
     if (!id) return undefined;
     let s = samples.get(id);
     if (!s) {
       const snd = sounds[id];
       if (!snd) return undefined;
-      s = renderSfx(snd.params);
+      s = soundPcm(snd);
       samples.set(id, s);
     }
     return s;
@@ -355,15 +363,16 @@ export function renderSong(
       const note = v.note + v.bend + offsets[ch]!;
       let s = 0;
       if (inst.wave === 'sample') {
-        const buf = sampleFor(inst.sound);
+        const clip = sampleFor(inst.sound);
+        const buf = clip?.samples;
         const i = Math.floor(v.phase);
-        if (!buf || i + 1 >= buf.length) {
+        if (!clip || !buf || i + 1 >= buf.length) {
           v.on = false;
           continue;
         }
         const f = v.phase - i;
         s = (buf[i]! * (1 - f) + buf[i + 1]! * f) * 2;
-        v.phase += (2 ** ((note - 60) / 12) * SFX_RATE) / rate;
+        v.phase += (2 ** ((note - 60) / 12) * clip.rate) / rate;
       } else {
         const prev = v.phase;
         v.phase = (v.phase + freqOf(note) / rate) % 1;

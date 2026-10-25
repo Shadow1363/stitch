@@ -6,3 +6,4 @@ export * from './map';
 export * from './bytes';
 export * from './sfx';
 export * from './music';
+export * from './sample';

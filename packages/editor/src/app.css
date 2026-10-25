@@ -171,6 +171,12 @@ input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [ty
   padding: 3px 6px;
 }
 
+/* Blockly comments: its default yellow fill ignores the theme, so use the editor's tokens. */
+:root .injectionDiv { --commentFillColour: var(--well); --commentBorderColour: var(--line-strong); }
+.blocklyTextarea { color: var(--text); }
+.blocklyTextarea::placeholder { color: var(--muted); opacity: 1; }
+.blocklyComment .blocklyCommentPreview.blocklyText { fill: var(--text); }
+
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 
 input[type='range'], input[type='checkbox'], input[type='radio'] { accent-color: var(--accent); }

@@ -11,6 +11,8 @@ export const TOP_TYPES = new Set([
   'stitch_on_message',
   'stitch_on_clone',
   'stitch_on_click',
+  'stitch_on_greater',
+  'stitch_on_backdrop',
   'stitch_raw_item',
 ]);
 
@@ -137,6 +139,31 @@ export const DEFINITIONS: Def[] = [
   {
     type: 'stitch_on_click',
     message0: 'when this sprite clicked',
+    nextStatement: null,
+    style: 'event_blocks',
+  },
+  {
+    type: 'stitch_on_backdrop',
+    message0: 'when backdrop switches to %1',
+    args0: [text('NAME', 'backdrop1')],
+    nextStatement: null,
+    style: 'event_blocks',
+  },
+  {
+    type: 'stitch_on_greater',
+    message0: 'when %1 > %2',
+    args0: [
+      {
+        type: 'field_dropdown',
+        name: 'WHAT',
+        options: [
+          ['timer', 'timer'],
+          ['loudness', 'loudness'],
+        ],
+      },
+      // The grammar has no negative literals here; neither value goes below 0 anyway.
+      { type: 'field_number', name: 'VALUE', value: 10, min: 0 },
+    ],
     nextStatement: null,
     style: 'event_blocks',
   },

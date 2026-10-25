@@ -110,6 +110,11 @@ export class StageClient {
     this.post({ t: 'http-result', id, ...res });
   }
 
+  /** The editor's microphone level, for `loudness`. */
+  loudness(level: number) {
+    this.post({ t: 'loudness', level });
+  }
+
   focus() {
     this.iframe.focus();
   }

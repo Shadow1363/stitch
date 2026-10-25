@@ -1,16 +1,16 @@
 import type { Music, Song, Sound } from '@stitch/cart';
-import { MUSIC_RATE, renderSfx, renderSong, SFX_RATE } from '@stitch/cart/audio';
+import { MUSIC_RATE, renderSong, soundPcm } from '@stitch/cart/audio';
 import type { PcmClip } from '@stitch/runtime/protocol';
 
 /**
  * Rendered samples by source. Rendering a song takes a moment, and the stage reloads on every
  * edit, so unchanged sources reuse their samples. Cleared when it grows past CACHE_LIMIT.
  */
-const cache = new Map<string, Float32Array>();
+const cache = new Map<string, unknown>();
 const CACHE_LIMIT = 64;
 
-function cached(key: string, render: () => Float32Array): Float32Array {
-  let hit = cache.get(key);
+function cached<T>(key: string, render: () => T): T {
+  let hit = cache.get(key) as T | undefined;
   if (!hit) {
     if (cache.size >= CACHE_LIMIT) cache.clear();
     hit = render();
@@ -19,15 +19,21 @@ function cached(key: string, render: () => Float32Array): Float32Array {
   return hit;
 }
 
-export function soundSamples(s: Sound): Float32Array {
-  return cached(`sfx:${JSON.stringify(s.params)}`, () => renderSfx(s.params));
+/** A sound as samples at its own rate. A recording's key is its data, which the Map hashes once. */
+export function soundClip(s: Sound): { rate: number; samples: Float32Array } {
+  const key =
+    s.kind === 'sample' ? `sample:${s.rate}:${s.data}` : `sfx:${JSON.stringify(s.params)}`;
+  return cached(key, () => soundPcm(s));
 }
 
 /** Sounds a song plays as sample instruments, so they can be part of its cache key. */
 function samplesUsed(music: Music, sounds: Record<string, Sound>) {
   const used: Record<string, unknown> = {};
   for (const i of Object.values(music.instruments))
-    if (i.wave === 'sample' && i.sound && sounds[i.sound]) used[i.sound] = sounds[i.sound]!.params;
+    if (i.wave === 'sample' && i.sound && sounds[i.sound]) {
+      const s = sounds[i.sound]!;
+      used[i.sound] = s.kind === 'sample' ? s.data : s.params;
+    }
   return used;
 }
 
@@ -47,12 +53,10 @@ export function stageClips(
   music: Music,
 ): { sounds: PcmClip[]; songs: PcmClip[] } {
   return {
-    sounds: Object.entries(sounds).map(([id, s]) => ({
-      id,
-      name: s.name,
-      rate: SFX_RATE,
-      samples: soundSamples(s).slice(),
-    })),
+    sounds: Object.entries(sounds).map(([id, s]) => {
+      const clip = soundClip(s);
+      return { id, name: s.name, rate: clip.rate, samples: clip.samples.slice() };
+    }),
     songs: Object.entries(music.songs).map(([id, s]) => ({
       id,
       name: s.name,

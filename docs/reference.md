@@ -384,6 +384,8 @@ Values every program can read without declaring them. Sprite properties are writ
 | [`timer()`](#timer--reporter) | number | the whole program | read-only | Seconds since **Run** or the last `reset_timer()`. |
 | [`http_status()`](#http_status--reporter) | number | each sprite and clone | read-only | The HTTP status of this sprite's last finished request: `200`, `404` and so on, or `0` when there was no answer (not allowed, offline, blocked by CORS, timed out, or a reply over 1 MB). |
 | [`costume_name()`](#costume_name--reporter) | string | each sprite and clone | read-only | The current costume's name. |
+| [`backdrop_number()`](#backdrop_number--reporter) | number | the whole program | read-only | The current backdrop's number, from 1 (0 when the stage has none). |
+| [`backdrop_name()`](#backdrop_name--reporter) | string | the whole program | read-only | The current backdrop's name. |
 | [`is_clone()`](#is_clone--reporter) | boolean | each sprite and clone | read-only | True in a clone, false in the original sprite. |
 | [`clone_count()`](#clone_count--reporter) | number | each sprite and its clones together | read-only | How many clones of this sprite exist now. |
 | [`my_id()`](#my_id--reporter) | string | each sprite and clone | read-only | This sprite's id: its name, or `"Name#k"` in a clone. |
@@ -393,6 +395,9 @@ Values every program can read without declaring them. Sprite properties are writ
 | [`touching_edge()`](#touching_edge--reporter) | boolean | each sprite and clone | read-only | True when the sprite's box reaches an edge of the stage. |
 | [`touching_mouse()`](#touching_mouse--reporter) | boolean | each sprite and clone | read-only | True when the pointer is over an opaque pixel of the sprite. |
 | [`delta_time()`](#delta_time--reporter) | number | the whole program | read-only | Seconds per tick: always 1/60, because Stitch runs at a fixed 60 ticks a second ([D28](departures.md)). |
+| [`days_since_2000()`](#days_since_2000--reporter) | number | the whole program | read-only | Days since midnight UTC on 1 January 2000, with a fraction for the time of day, as in Scratch ([D33](departures.md)). |
+| [`loudness()`](#loudness--reporter) | number | the whole program | read-only | The microphone's level, 0–100. |
+| [`username()`](#username--reporter) | string | the whole program | read-only | Always `""`: Stitch has no accounts, and Scratch reports `""` when nobody is signed in. |
 | [`map_width()`](#map_width--reporter) | number | the whole program | read-only | The map's width in cells (0 without a map). |
 | [`map_height()`](#map_height--reporter) | number | the whole program | read-only | The map's height in cells. |
 | [`tile_size()`](#tile_size--reporter) | number | the whole program | read-only | The map's tile size in stage pixels. |
@@ -552,6 +557,36 @@ end
 ```
 
 </td><td><img src="blocks/on-click.svg" alt="when this sprite clicked: say Ouch! for 1 seconds"></td></tr></table>
+
+### `on backdrop "b" do … end` — when backdrop switches to
+
+Runs when the stage switches to the backdrop with this name, from [`backdrop`](#backdropbackdrop--command), `backdrop_wait` or `next_backdrop`.
+
+<table><tr><td>
+
+<!-- example: on-backdrop -->
+```stitch
+on backdrop "night" do
+  show()
+end
+```
+
+</td><td><img src="blocks/on-backdrop.svg" alt="when backdrop switches to night: show"></td></tr></table>
+
+### `on timer > n do … end` — when timer or loudness is more than
+
+Runs once each time the [timer](#timer--reporter) or the microphone [loudness](#loudness--reporter) rises above `n`. It runs again only after the value drops back to `n` or below and rises again, as in Scratch. `n` is a plain number.
+
+<table><tr><td>
+
+<!-- example: on-greater -->
+```stitch
+on timer > 5 do
+  say("Five seconds!")
+end
+```
+
+</td><td><img src="blocks/on-greater.svg" alt="when timer > 5: say Five seconds!"></td></tr></table>
 
 <!-- /generated -->
 
@@ -1093,6 +1128,19 @@ glide(1, 100, 0)
 
 </td><td><img src="blocks/glide.svg" alt="glide 1 secs to x 100 y 0"></td></tr></table>
 
+### `glide_to(seconds, sprite)` — command, waits
+
+Glides to another sprite, `"mouse"` or `"random"` (a random spot on stage) over `seconds`. A sprite that doesn't exist does nothing.
+
+<table><tr><td>
+
+<!-- example: glide_to -->
+```stitch
+glide_to(1, "mouse")
+```
+
+</td><td><img src="blocks/glide_to.svg" alt="glide 1 secs to mouse"></td></tr></table>
+
 ### `point_towards_sprite(sprite)` — command
 
 Turns to face another sprite (or `"mouse"`).
@@ -1248,7 +1296,7 @@ say(costume_name())
 
 ### `set_effect(effect, value)` — command
 
-Sets a graphic effect: `"ghost"` (0–100, see-through), `"brightness"` (-100–100) or `"color"` (hue; 200 is a full turn).
+Sets a graphic effect: `"ghost"` (0–100, see-through), `"brightness"` (-100–100), `"color"` (hue; 200 is a full turn), or one that bends the costume: `"fisheye"`, `"whirl"` (degrees at the centre), `"pixelate"` or `"mosaic"`, on Scratch's scales. Touching follows the bent shape.
 
 <table><tr><td>
 
@@ -1271,6 +1319,71 @@ change_effect("color", 25)
 ```
 
 </td><td><img src="blocks/change_effect.svg" alt="change color effect by 25"></td></tr></table>
+
+### `backdrop(backdrop)` — command
+
+Switches the stage to a backdrop, by name or 1-based number, or to `"next backdrop"`, `"previous backdrop"` or `"random backdrop"` (a different one). Starts every [`on backdrop`](#on-backdrop-b-do--end--when-backdrop-switches-to) script for it. Backdrops are the stage's costumes, painted in the Costumes tab with the Stage file selected.
+
+<table><tr><td>
+
+<!-- example: backdrop -->
+```stitch
+backdrop("night")
+```
+
+</td><td><img src="blocks/backdrop.svg" alt="switch backdrop to night"></td></tr></table>
+
+### `backdrop_wait(backdrop)` — command, waits
+
+Like `backdrop`, then waits until the `on backdrop` scripts it started have finished.
+
+<table><tr><td>
+
+<!-- example: backdrop_wait -->
+```stitch
+backdrop_wait("level 2")
+```
+
+</td><td><img src="blocks/backdrop_wait.svg" alt="switch backdrop to level 2 and wait"></td></tr></table>
+
+### `next_backdrop()` — command
+
+Switches to the next backdrop, back to the first after the last.
+
+<table><tr><td>
+
+<!-- example: next_backdrop -->
+```stitch
+next_backdrop()
+```
+
+</td><td><img src="blocks/next_backdrop.svg" alt="next backdrop"></td></tr></table>
+
+### `backdrop_number()` — reporter
+
+The current backdrop's number, from 1 (0 when the stage has none).
+
+<table><tr><td>
+
+<!-- example: backdrop_number -->
+```stitch
+say(backdrop_number())
+```
+
+</td><td><img src="blocks/backdrop_number.svg" alt="say backdrop number"></td></tr></table>
+
+### `backdrop_name()` — reporter
+
+The current backdrop's name.
+
+<table><tr><td>
+
+<!-- example: backdrop_name -->
+```stitch
+say(backdrop_name())
+```
+
+</td><td><img src="blocks/backdrop_name.svg" alt="say backdrop name"></td></tr></table>
 
 ### `clear_effects()` — command
 
@@ -1435,6 +1548,45 @@ change_volume(-10)
 ```
 
 </td><td><img src="blocks/change_volume.svg" alt="change volume by -10"></td></tr></table>
+
+### `set_sound_effect(effect, value)` — command
+
+Sets one of this sprite's sound effects: `"pitch"` (10 is a semitone, ±360) or `"pan"` (-100 left to 100 right). It changes the sounds the sprite is playing and the ones it plays next. `play_sound_wait` waits less for a sound pitched up.
+
+<table><tr><td>
+
+<!-- example: set_sound_effect -->
+```stitch
+set_sound_effect("pitch", 120)
+```
+
+</td><td><img src="blocks/set_sound_effect.svg" alt="set pitch effect to 120"></td></tr></table>
+
+### `change_sound_effect(effect, by)` — command
+
+Changes one of this sprite's sound effects by an amount.
+
+<table><tr><td>
+
+<!-- example: change_sound_effect -->
+```stitch
+change_sound_effect("pan", -50)
+```
+
+</td><td><img src="blocks/change_sound_effect.svg" alt="change pan effect by -50"></td></tr></table>
+
+### `clear_sound_effects()` — command
+
+Puts this sprite's pitch and pan back to 0.
+
+<table><tr><td>
+
+<!-- example: clear_sound_effects -->
+```stitch
+clear_sound_effects()
+```
+
+</td><td><img src="blocks/clear_sound_effects.svg" alt="clear sound effects"></td></tr></table>
 
 <!-- /generated -->
 
@@ -1933,6 +2085,19 @@ costume(costume_of("Player"))
 
 </td><td><img src="blocks/costume_of.svg" alt="switch costume to costume # of Player"></td></tr></table>
 
+### `size_of(sprite)` — reporter
+
+Another sprite's size, in percent.
+
+<table><tr><td>
+
+<!-- example: size_of -->
+```stitch
+size = size_of("Player")
+```
+
+</td><td><img src="blocks/size_of.svg" alt="set size to size of Player"></td></tr></table>
+
 ### `var_of(sprite, variable)` — reporter
 
 Another sprite's variable (its own `var`, then its `shared var`). For `"stage"`, a stage or global variable. `""` when there's none.
@@ -2005,6 +2170,75 @@ end
 ```
 
 </td><td><img src="blocks/stage_height.svg" alt="if y > stage height / 2 then set y to -stage height / 2"></td></tr></table>
+
+### `current(unit)` — reporter
+
+Part of the date or time on this computer: `"year"`, `"month"` (1–12), `"date"`, `"day of week"` (1 is Sunday), `"hour"`, `"minute"` or `"second"`. Read once at the start of each tick, so a run that uses it doesn't replay the same way ([D33](departures.md)).
+
+<table><tr><td>
+
+<!-- example: current -->
+```stitch
+say(current("hour") .. ":" .. current("minute"))
+```
+
+</td><td><img src="blocks/current.svg" alt="say join current hour : current minute"></td></tr></table>
+
+### `days_since_2000()` — reporter
+
+Days since midnight UTC on 1 January 2000, with a fraction for the time of day, as in Scratch ([D33](departures.md)).
+
+<table><tr><td>
+
+<!-- example: days_since_2000 -->
+```stitch
+say(floor(days_since_2000()))
+```
+
+</td><td><img src="blocks/days_since_2000.svg" alt="say floor of days since 2000"></td></tr></table>
+
+### `loudness()` — reporter
+
+The microphone's level, 0–100. The editor asks before it turns the microphone on, and only for a cart that uses loudness; until then, or with no microphone, it's -1 ([D34](departures.md)).
+
+<table><tr><td>
+
+<!-- example: loudness -->
+```stitch
+if loudness() > 30 then
+  say("Shh!")
+end
+```
+
+</td><td><img src="blocks/loudness.svg" alt="if loudness > 30 then say Shh!"></td></tr></table>
+
+### `username()` — reporter
+
+Always `""`: Stitch has no accounts, and Scratch reports `""` when nobody is signed in.
+
+<table><tr><td>
+
+<!-- example: username -->
+```stitch
+if username() == "" then
+  say("Hello, stranger!")
+end
+```
+
+</td><td><img src="blocks/username.svg" alt="if username = (empty) then say Hello, stranger!"></td></tr></table>
+
+### `set_drag_mode(draggable)` — command
+
+With `true`, the mouse can drag this sprite around the stage (it comes to the front). Off by default, in the editor too ([D35](departures.md)).
+
+<table><tr><td>
+
+<!-- example: set_drag_mode -->
+```stitch
+set_drag_mode(true)
+```
+
+</td><td><img src="blocks/set_drag_mode.svg" alt="set draggable true"></td></tr></table>
 
 <!-- /generated -->
 
@@ -2251,6 +2485,71 @@ change_pen_transparency(10)
 ```
 
 </td><td><img src="blocks/change_pen_transparency.svg" alt="change pen transparency by 10"></td></tr></table>
+
+### `set_pen_hue(hue)` — command
+
+Sets the pen hue on Scratch's 0–100 colour wheel (wrapping around), keeping saturation and brightness.
+
+<table><tr><td>
+
+<!-- example: set_pen_hue -->
+```stitch
+set_pen_hue(50)
+```
+
+</td><td><img src="blocks/set_pen_hue.svg" alt="set pen hue to 50"></td></tr></table>
+
+### `set_pen_saturation(percent)` — command
+
+0 is grey, 100 is full colour.
+
+<table><tr><td>
+
+<!-- example: set_pen_saturation -->
+```stitch
+set_pen_saturation(50)
+```
+
+</td><td><img src="blocks/set_pen_saturation.svg" alt="set pen saturation to 50"></td></tr></table>
+
+### `change_pen_saturation(by)` — command
+
+Changes the pen saturation, staying within 0–100.
+
+<table><tr><td>
+
+<!-- example: change_pen_saturation -->
+```stitch
+change_pen_saturation(-10)
+```
+
+</td><td><img src="blocks/change_pen_saturation.svg" alt="change pen saturation by -10"></td></tr></table>
+
+### `set_pen_brightness(percent)` — command
+
+0 is black, 100 is full brightness.
+
+<table><tr><td>
+
+<!-- example: set_pen_brightness -->
+```stitch
+set_pen_brightness(50)
+```
+
+</td><td><img src="blocks/set_pen_brightness.svg" alt="set pen brightness to 50"></td></tr></table>
+
+### `change_pen_brightness(by)` — command
+
+Changes the pen brightness, staying within 0–100.
+
+<table><tr><td>
+
+<!-- example: change_pen_brightness -->
+```stitch
+change_pen_brightness(10)
+```
+
+</td><td><img src="blocks/change_pen_brightness.svg" alt="change pen brightness by 10"></td></tr></table>
 
 ### `draw_line(x1, y1, x2, y2)` — command
 
@@ -2812,6 +3111,19 @@ say(substring("hello", 2, 4))
 
 </td><td><img src="blocks/substring.svg" alt="say letters 2 to 4 of hello"></td></tr></table>
 
+### `letter_of(index, text)` — reporter
+
+Letter `index` of `text`, counting from 1. `""` past either end.
+
+<table><tr><td>
+
+<!-- example: letter_of -->
+```stitch
+say(letter_of(1, "apple"))
+```
+
+</td><td><img src="blocks/letter_of.svg" alt="say letter 1 of apple"></td></tr></table>
+
 ### `upper(text)` — reporter
 
 The text in capitals.
@@ -3096,6 +3408,19 @@ end
 
 </td><td><img src="blocks/watch.svg" alt="forever: watch score as score"></td></tr></table>
 
+### `unwatch(label)` — command
+
+Takes down the monitor that `watch` put up with this label, like hiding a variable in Scratch.
+
+<table><tr><td>
+
+<!-- example: unwatch -->
+```stitch
+unwatch("score")
+```
+
+</td><td><img src="blocks/unwatch.svg" alt="stop watching score"></td></tr></table>
+
 ### `assert(condition, message)` — command
 
 Stops the script with an error when `condition` is false, pointing at this line. Use it to catch mistakes early.
@@ -3163,6 +3488,9 @@ The tracker's effect column takes a letter or digit and two hex digits, as in cl
 | `message` | [`on message`](#on-message-m-do--end--when-i-receive) |
 | `clone` | [`on clone`](#on-clone-do--end--when-i-start-as-a-clone) |
 | `click` | [`on click`](#on-click-do--end--when-this-sprite-clicked) |
+| `backdrop` | [`on backdrop`](#on-backdrop-b-do--end--when-backdrop-switches-to) |
+| `timer` | [`on timer >`](#on-timer--n-do--end--when-timer-or-loudness-is-more-than) |
+| `loudness` | [`on loudness >`](#on-timer--n-do--end--when-timer-or-loudness-is-more-than) |
 | `do` | Starts the body of an event, loop or function |
 | `end` | Ends a block |
 | `if` | [If](#if--then--elseif--else--end) |

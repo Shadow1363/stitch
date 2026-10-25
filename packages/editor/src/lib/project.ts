@@ -75,6 +75,8 @@ export async function payloadFor(session: Session, b: Build): Promise<LoadPayloa
     code: b.compiled.code,
     stage: session.stage,
     sprites: session.sprites,
+    backdrops: session.backdrops,
+    backdrop: session.backdrop,
     costumes: await renderCostumes(session.assets, session.palette),
     ...stageClips(session.sounds, session.music),
     extensions: session.extensions.map(extensionSource),

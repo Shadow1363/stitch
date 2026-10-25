@@ -92,6 +92,10 @@ describe('completions', () => {
       'ghost',
       'brightness',
       'color',
+      'fisheye',
+      'whirl',
+      'pixelate',
+      'mosaic',
     ]);
     expect(labels('on key "|"')).toContain('space');
     expect(labels('on message "|"')).toEqual(['win', 'lose']);

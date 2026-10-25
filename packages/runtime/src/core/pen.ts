@@ -1,6 +1,6 @@
 import { DEFAULT_PALETTE, parseHex } from '@stitch/cart';
 import type { Space } from './space';
-import type { PenState, RotationStyle, Sprite } from './sprite';
+import type { Effects, PenState, RotationStyle, Sprite } from './sprite';
 import * as $ from './values';
 import type { Value } from './values';
 
@@ -34,6 +34,8 @@ export type PenOp =
       center: [number, number];
       pose: StampPose;
       alpha: number;
+      /** The sprite's graphic effects when stamped, so the stamp looks as the sprite did. */
+      effects: Effects;
     };
 
 /** Ops kept for a renderer that hasn't drawn yet. Past this, the oldest half is dropped. */
@@ -117,7 +119,14 @@ export class Pen {
       rotationStyle: s.rotationStyle,
     };
     const alpha = 1 - s.effects.ghost / 100;
-    this.push({ kind: 'stamp', costume: c.id, center: c.center, pose, alpha });
+    this.push({
+      kind: 'stamp',
+      costume: c.id,
+      center: c.center,
+      pose,
+      alpha,
+      effects: { ...s.effects },
+    });
   }
 
   /**

@@ -7,6 +7,7 @@
   import type { FileContext } from '@stitch/ir';
   import type { AssistData } from './lib/assist';
   import type { FromStage } from '@stitch/runtime/protocol';
+  import { Microphone, streamLevel, usesLoudness } from '@stitch/runtime/mic';
   import { onMount } from 'svelte';
   import type BlocksViewComponent from './lib/BlocksView.svelte';
   import type SoundsPanelComponent from './lib/SoundsPanel.svelte';
@@ -14,7 +15,8 @@
   import CodeEditor from './lib/CodeEditor.svelte';
   import CostumesPanel from './lib/CostumesPanel.svelte';
   import { History, type HistoryEntry } from './lib/doc';
-  import { cartFilename, cartFromFile, cartFromUrl, cartToPng, download } from './lib/files';
+  import { cartFilename, cartFromFile, cartFromUrl, cartToPng, download, type Opened } from './lib/files';
+  import { describeImport } from './lib/scratch';
   import MapEditor from './lib/MapEditor.svelte';
   import { build, loadSample, locateRuntimeError, payloadFor, type Build, type Located } from './lib/project';
   import { openSample, SAMPLES } from './lib/samples';
@@ -26,7 +28,7 @@
   import { nativeFetch, NetProxy } from './lib/net';
   import NetworkPanel from './lib/NetworkPanel.svelte';
   import { loadSecrets, saveSecrets, type Secret } from './lib/secrets';
-  import { ask, askText } from './lib/dialog.svelte';
+  import { ask, askText, tell } from './lib/dialog.svelte';
   import Dialogs from './lib/Dialogs.svelte';
   import Logo from './lib/Logo.svelte';
   import { setThemePref, themePref, type ThemePref } from './lib/theme';
@@ -235,6 +237,8 @@
   /** `hosts`: network permissions to keep (only when restoring the autosave). */
   function openSession(s: Session, message?: string, hosts: string[] = []) {
     if (running) stop();
+    closeMic();
+    micAllowed = undefined;
     setHosts(hosts);
     session = s;
     sessionNo++;
@@ -249,6 +253,13 @@
 
   function openCart(cart: Cart, message: string, hosts: string[] = []) {
     openSession(Session.fromCart(cart), message, hosts);
+  }
+
+  /** Opens a loaded file; a Scratch import also says what came across and what didn't. */
+  function openLoaded(o: Opened, from: string) {
+    openCart(o.cart, o.report ? `Imported ${from} from Scratch.` : `Opened ${from}`);
+    const summary = o.report && describeImport(o.report);
+    if (summary) void tell('Imported from Scratch', summary);
   }
 
   function fail(what: string, err: unknown) {
@@ -267,7 +278,7 @@
     }
     const url = new URLSearchParams(location.search).get('cart');
     if (url) {
-      cartFromUrl(url).then((c) => openCart(c, `Opened ${url}`), (e: unknown) => fail('Couldn’t open the cart', e));
+      cartFromUrl(url).then((o) => openLoaded(o, url), (e: unknown) => fail('Couldn’t open the cart', e));
       return;
     }
     loadSecrets().then(
@@ -295,7 +306,7 @@
 
   async function openFile(f: File) {
     try {
-      openCart(await cartFromFile(f), `Opened ${f.name}`);
+      openLoaded(await cartFromFile(f), f.name);
     } catch (e) {
       fail(`Couldn’t open ${f.name}`, e);
     }
@@ -312,7 +323,7 @@
 
   async function openUrl(url: string) {
     try {
-      openCart(await cartFromUrl(url), `Opened ${url}`);
+      openLoaded(await cartFromUrl(url), url);
     } catch (e) {
       fail('Couldn’t open the cart', e);
     }
@@ -558,6 +569,36 @@
     stage.run();
     running = true;
     paused = false;
+    void startMicIfUsed();
+  }
+
+  /** The microphone behind `loudness`: asked once per cart, kept open until Stop (D34). */
+  let mic: Microphone | undefined;
+  let micAllowed: boolean | undefined;
+  let stopMicStream: (() => void) | undefined;
+
+  async function startMicIfUsed() {
+    if (!result.compiled.ok || !usesLoudness(result.compiled.code) || micAllowed === false) return;
+    micAllowed ??= await ask('Use the microphone?', {
+      message: 'This cart reads how loud it is around you. Only the level goes to the stage; no sound is recorded or saved.',
+      ok: 'Allow',
+      cancel: 'Not now',
+    });
+    if (!micAllowed) return;
+    mic ??= await Microphone.open();
+    if (!mic) {
+      micAllowed = false;
+      print('error', 'No microphone is available, so loudness() stays -1.');
+      return;
+    }
+    stopMicStream ??= streamLevel(mic, (level) => stage.loudness(level));
+  }
+
+  function closeMic() {
+    stopMicStream?.();
+    stopMicStream = undefined;
+    mic?.close();
+    mic = undefined;
   }
 
   function togglePause() {
@@ -570,6 +611,7 @@
     paused = false;
     stage.stop();
     running = false;
+    closeMic();
   }
 
   function onStage(m: FromStage) {
@@ -620,7 +662,7 @@
   <header>
     <div class="brand"><Logo size={22} /><span>Stitch</span></div>
     <button class="run" onclick={run} title="Run (restart from the beginning)"><Play />Run</button>
-    <button onclick={togglePause} disabled={!running} aria-pressed={paused} title={paused ? 'Continue from where it paused' : 'Pause: freeze the game, sound included'}>{#if paused}<Play />Resume{:else}<Pause />Pause{/if}</button>
+    <button onclick={togglePause} disabled={!running} aria-pressed={paused} class="pause" title={paused ? 'Continue from where it paused' : 'Pause: freeze the game, sound included'}><span class:off={paused}><Pause />Pause</span><span class:off={!paused}><Play />Resume</span></button>
     <button class="stop" onclick={stop} disabled={!running} title="Stop all scripts"><Square />Stop</button>
     <span class="sep"></span>
     <div class="seg" role="tablist" aria-label="Section">
@@ -765,9 +807,6 @@
             {#snippet a()}
               <div class="stage-pane">
                 <Stage bind:this={stage} onmessage={onStage} />
-                {#if running && audioState === 'suspended'}
-                  <p class="hint" role="status">Sound is off until you click or press a key on the stage (browser autoplay rules).</p>
-                {/if}
               </div>
             {/snippet}
             {#snippet b()}
@@ -789,6 +828,9 @@
               </ul>
               <h3>Console</h3>
               <ul class="console">
+                {#if running && audioState === 'suspended'}
+                  <li class="hint" role="status">Sound is off until you click or press a key on the stage (browser autoplay rules).</li>
+                {/if}
                 {#each consoleLines as l, i (i)}
                   <li class={l.kind}>
                     {#if l.at}<button class="link" onclick={() => goTo(l.at!)}>{session.doc(l.at.fileId)?.name}:{lineCol(l.at.fileId, l.at.from)}</button>{/if}
@@ -818,6 +860,11 @@
   .docs-link { display: inline-flex; align-items: center; gap: var(--space-1); padding: var(--space-1) 10px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--panel); color: var(--text); text-decoration: none; font-size: var(--text-s); }
   .docs-link:hover { border-color: var(--text); }
   .docs-link :global(svg) { width: 1.15em; height: 1.15em; }
+  /* Both labels share one cell, so the button keeps the wider one's width when it flips. */
+  .pause { display: inline-grid; }
+  .pause > span { grid-area: 1 / 1; display: inline-flex; align-items: center; justify-content: center; gap: var(--space-1); }
+  .pause > span > :global(svg.lucide-icon) { width: 1.15em; height: 1.15em; flex: none; }
+  .pause > .off { visibility: hidden; }
   .run { background: var(--go); border-color: var(--go); color: var(--on-go); font-weight: 600; }
   .seg { display: inline-flex; }
   .seg button { border-radius: 0; margin-left: -1px; }
@@ -845,7 +892,7 @@
   .panel-host.scroll { overflow: auto; }
   .panel-extra { padding: 0 16px 16px; display: flex; flex-direction: column; gap: 18px; max-width: 560px; }
   .loading { padding: 16px; color: var(--muted); }
-  .hint { margin: 0; font-size: 12px; color: var(--muted); }
+  .hint { margin: 0; font-family: var(--font-ui); font-size: 12px; color: var(--muted); }
   .right { display: flex; flex-direction: column; padding: 12px; min-height: 0; height: 100%; box-sizing: border-box; }
   .panel { flex: 1; min-height: 0; overflow: auto; }
   .panel h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 10px 0 4px; }

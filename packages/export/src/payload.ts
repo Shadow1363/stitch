@@ -3,7 +3,7 @@
  * rendering for its sandboxed stage; players render everything here at start-up.
  */
 import { decodeTiles, isPixelArt, type Asset, type Music, type Sound } from '@stitch/cart';
-import { MUSIC_RATE, renderSfx, renderSong, SFX_RATE } from '@stitch/cart/audio';
+import { MUSIC_RATE, renderSong, soundPcm } from '@stitch/cart/audio';
 import { renderAsset } from '@stitch/cart/render';
 import { extensionSource } from '@stitch/runtime/extensions';
 import type { CostumeImage, LoadPayload, PcmClip } from '@stitch/runtime/protocol';
@@ -39,12 +39,7 @@ export function renderClips(
   music: Music,
 ): { sounds: PcmClip[]; songs: PcmClip[] } {
   return {
-    sounds: Object.entries(sounds).map(([id, s]) => ({
-      id,
-      name: s.name,
-      rate: SFX_RATE,
-      samples: renderSfx(s.params),
-    })),
+    sounds: Object.entries(sounds).map(([id, s]) => ({ id, name: s.name, ...soundPcm(s) })),
     songs: Object.entries(music.songs).map(([id, s]) => ({
       id,
       name: s.name,
@@ -60,6 +55,8 @@ export async function gamePayload(game: ExportedGame): Promise<LoadPayload> {
     code: game.code,
     stage: game.stage,
     sprites: game.sprites,
+    backdrops: game.backdrops,
+    backdrop: game.backdrop,
     costumes: await renderCostumes(game.assets, game.palette),
     ...renderClips(game.sounds, game.music),
     extensions: game.extensions.map(extensionSource),

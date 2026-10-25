@@ -1,11 +1,12 @@
 /**
- * Behaviour of the Phase 9 blocks (clones, pen, sensing, data, control), compiled from real
- * Stitch source and run on World with NullRenderer.
+ * Behaviour of the Phase 9 and Phase 14 blocks (clones, pen, sensing, data, control and the
+ * rest of Scratch 3), compiled from real Stitch source and run on World with NullRenderer.
  */
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_STAGE, type SpriteInit, type StageSettings } from '@stitch/cart';
 import {
   Dict,
+  NullAudio,
   NullRenderer,
   World,
   type AskOut,
@@ -13,6 +14,7 @@ import {
   type MapInit,
   type PenOp,
   type Program,
+  type WorldOptions,
 } from '@stitch/runtime';
 import { compile } from './compile';
 import { projectFrom } from './testing';
@@ -38,8 +40,11 @@ function run(
     init?: Record<string, Partial<SpriteInit>>;
     map?: MapInit;
     ask?: AskOut;
+    /** Anything else to hand the World (backdrops, audio, clock…). */
+    world?: Partial<WorldOptions>;
   } = {},
 ) {
+  const { costumes: extraCostumes, ...worldRest } = opts.world ?? {};
   const project = projectFrom(sprites, opts.stage);
   const r = compile(project);
   if (!r.ok) throw new Error(JSON.stringify(r.diagnostics));
@@ -60,12 +65,13 @@ function run(
       costume: 1,
       ...opts.init?.[s.name],
     })),
-    costumes: { box: box('box'), ring: box('ring', true) },
+    costumes: { box: box('box'), ring: box('ring', true), ...extraCostumes },
     ...(opts.map ? { map: opts.map } : {}),
     ...(opts.ask ? { ask: opts.ask } : {}),
     seed: 7,
     onLog: (_s, t) => logs.push(t),
     onError: (e) => errors.push(String(e.error)),
+    ...worldRest,
   });
   world.load(new Function('rt', r.code) as Program);
   world.start();
@@ -422,7 +428,7 @@ describe('motion and looks', () => {
     });
     ticks(1);
     const a = sprite('A');
-    expect(a.effects).toEqual({ ghost: 100, brightness: -30, color: 0 });
+    expect(a.effects).toMatchObject({ ghost: 100, brightness: -30, color: 0 });
     expect(world.sprites.map((s) => s.name)).toEqual(['B', 'A']);
     expect(a.rotationStyle).toBe('left-right');
     expect([a.sayText, a.thinking]).toEqual(['hmm', true]);
@@ -525,5 +531,186 @@ describe('ask and answer', () => {
     );
     ticks(62);
     expect(logs).toEqual(['128x96', '60']);
+  });
+});
+
+describe('the rest of Scratch 3 (Phase 14)', () => {
+  it('glides to a sprite or the mouse; a missing target does nothing', () => {
+    const { ticks, sprite, world } = run(
+      {
+        A: 'on start do\n  glide_to(0.5, "B")\n  glide_to(0.5, "nobody")\n  glide_to(0.5, "mouse")\nend',
+        B: '',
+      },
+      { init: { B: { x: 30, y: -60 } } },
+    );
+    world.input.mouseX = -10;
+    world.input.mouseY = 20;
+    ticks(31);
+    expect([sprite('A').x, sprite('A').y]).toEqual([30, -60]);
+    ticks(30);
+    expect([sprite('A').x, sprite('A').y]).toEqual([-10, 20]);
+  });
+
+  it('letter_of, size_of and pen hue, saturation and brightness', () => {
+    const { ticks, logs, sprite } = run(
+      {
+        A: 'on start do\n  print(letter_of(2, "héllo") .. letter_of(9, "abc") .. "|")\n  print(size_of("B"))\n  set_pen_hue(130)\n  set_pen_saturation(40)\n  change_pen_saturation(-50)\n  set_pen_brightness(90)\n  change_pen_brightness(30)\nend',
+        B: '',
+      },
+      { init: { B: { size: 250 } } },
+    );
+    ticks(1);
+    expect(logs).toEqual(['é|', '250']);
+    const p = sprite('A').pen;
+    expect([p.hue, p.saturation, p.brightness]).toEqual([30, 0, 100]);
+  });
+
+  it('unwatch takes a monitor down', () => {
+    const { ticks, world } = run({
+      A: 'on start do\n  watch("hp", 3)\n  watch("mp", 1)\n  unwatch("hp")\nend',
+    });
+    ticks(1);
+    expect([...world.watches]).toEqual([['mp', '1']]);
+  });
+
+  it('runs the timer hat once per crossing, and again after reset_timer', () => {
+    const { ticks, logs } = run({
+      A: 'on timer > 0.5 do\n  print("half")\nend',
+      B: 'on start do\n  wait(1)\n  reset_timer()\nend',
+    });
+    ticks(90);
+    expect(logs).toEqual(['half']);
+    ticks(40);
+    expect(logs).toEqual(['half', 'half']);
+  });
+
+  it('runs the loudness hat when the level rises above it', () => {
+    const { ticks, logs, world } = run({ A: 'on loudness > 10 do\n  print("loud")\nend' });
+    ticks(2);
+    world.loudness = 50;
+    ticks(2);
+    world.loudness = 5;
+    ticks(1);
+    world.loudness = 20;
+    ticks(2);
+    expect(logs).toEqual(['loud', 'loud']);
+  });
+
+  it('switches backdrops by name, number and menu word, and runs their hats', () => {
+    const { ticks, logs } = run(
+      {
+        A: 'on start do\n  print(backdrop_number() .. backdrop_name())\n  backdrop("night")\n  next_backdrop()\n  backdrop(2)\n  backdrop("previous backdrop")\n  wait(0)\n  print(backdrop_name())\nend',
+      },
+      {
+        stage: 'on backdrop "night" do\n  print("dark")\nend',
+        world: {
+          costumes: { day: box('day'), night: box('night') },
+          backdrops: ['day', 'night'],
+          backdrop: 1,
+        },
+      },
+    );
+    ticks(3);
+    // The hat starts on the next tick, after A (which started first) prints.
+    expect(logs).toEqual(['1day', 'day', 'dark']);
+  });
+
+  it('backdrop_wait waits for the hats it starts', () => {
+    const { ticks, logs } = run(
+      { A: 'on start do\n  backdrop_wait("night")\n  print("after")\nend' },
+      {
+        stage: 'on backdrop "night" do\n  wait(0.5)\n  print("hat done")\nend',
+        world: {
+          costumes: { day: box('day'), night: box('night') },
+          backdrops: ['day', 'night'],
+        },
+      },
+    );
+    ticks(40);
+    expect(logs).toEqual(['hat done', 'after']);
+  });
+
+  it("senses the backdrop's colour under a sprite", () => {
+    const { ticks, logs } = run(
+      { A: 'on start do\n  print(touching_color("#29adff"))\nend' },
+      {
+        init: { A: { costumes: ['ring'] } },
+        world: { costumes: { sky: box('sky') }, backdrops: ['sky'] },
+      },
+    );
+    ticks(1);
+    expect(logs).toEqual(['true']);
+  });
+
+  it('pitch and pan reach the audio, and pitch shortens the wait', () => {
+    const audio = new NullAudio();
+    const { ticks, logs } = run(
+      {
+        A: 'on start do\n  set_sound_effect("pitch", 120)\n  change_sound_effect("pan", -30)\n  play_sound_wait("beep")\n  print("done")\n  clear_sound_effects()\nend',
+      },
+      { world: { audio, sounds: [{ id: 's1', name: 'beep', seconds: 1 }] } },
+    );
+    ticks(30);
+    expect(logs).toEqual([]);
+    ticks(2);
+    expect(logs).toEqual(['done']);
+    expect(audio.calls).toEqual([
+      'effects A pitch 120 pan 0',
+      'effects A pitch 120 pan -30',
+      'sound s1 pitch 120 pan -30',
+      'effects A pitch 0 pan 0',
+    ]);
+  });
+
+  it('mosaic changes what touching sees', () => {
+    const { ticks, logs } = run({
+      Ring: 'on start do\n  print(sprite_at(0, 0))\n  set_effect("mosaic", 10)\n  print(sprite_at(0, 0))\nend',
+    });
+    ticks(1);
+    expect(logs).toEqual(['', 'Ring']);
+  });
+
+  it('reads the date and time once a tick from the clock', () => {
+    const { ticks, logs } = run(
+      {
+        A: 'on start do\n  print(current("year") .. "-" .. current("month") .. "-" .. current("date") .. " " .. current("day of week") .. " " .. current("hour") .. ":" .. current("minute") .. ":" .. current("second"))\n  print(username() .. "|")\nend',
+        B: 'on start do\n  print(days_since_2000())\nend',
+      },
+      {
+        world: {
+          clock: () => new Date(2024, 2, 5, 13, 7, 9).getTime(),
+        },
+      },
+    );
+    ticks(1);
+    expect(logs[0]).toBe('2024-3-5 3 13:7:9');
+    expect(logs[1]).toBe('|');
+    expect(Number(logs[2])).toBeCloseTo(
+      (new Date(2024, 2, 5, 13, 7, 9).getTime() - Date.UTC(2000, 0, 1)) / 86_400_000,
+      9,
+    );
+  });
+
+  it('drags a sprite with drag mode on, and only then', () => {
+    const { ticks, sprite, world } = run(
+      {
+        A: 'on start do\n  set_drag_mode(true)\nend',
+        B: '',
+      },
+      { init: { B: { x: 200 } } },
+    );
+    ticks(1);
+    world.input.pointerDown(0, 0);
+    world.input.pointerMove(50, 30);
+    ticks(1);
+    expect([sprite('A').x, sprite('A').y]).toEqual([50, 30]);
+    world.input.pointerUp();
+    world.input.pointerMove(-80, 0);
+    ticks(1);
+    expect(sprite('A').x).toBe(50);
+    world.input.pointerDown(200, 0);
+    world.input.pointerMove(0, 0);
+    ticks(1);
+    expect(sprite('B').x).toBe(200);
   });
 });

@@ -1,5 +1,5 @@
 import { parseHex } from '@stitch/cart';
-import { findByNameOrNumber } from './audio';
+import { findByNameOrNumber, pitchRate } from './audio';
 import { clampToStage, edgeCrossed, stageBounds } from './bounds';
 import { opaqueAt, spriteAt, spritesTouch, touchesColor, type Backdrop } from './collide';
 import { jsonGet, jsonParse } from './json';
@@ -7,7 +7,7 @@ import { settle, type HttpRequest } from './net';
 import { parseColor, rgbToHsv } from './pen';
 import { createRandom } from './random';
 import { STOP_THREAD } from './scheduler';
-import type { RotationStyle, Sprite } from './sprite';
+import { NO_EFFECTS, type Effects, type RotationStyle, type Sprite } from './sprite';
 import * as $ from './values';
 import { Dict, type Value } from './values';
 import type { World } from './world';
@@ -62,8 +62,23 @@ export function createBuiltins(w: World) {
     drawList: w.sprites,
     map: w.map,
     tileset: w.map ? w.costumes[w.map.tileset] : undefined,
+    stage: w.stage,
     background: rgbNumber(parseHex(space.settings.background)),
   });
+  /** Switches the stage's backdrop and starts its hats; returns the threads they started. */
+  const switchBackdrop = (b: Value) => {
+    const st = w.stage;
+    const n = st.costumes.length;
+    if (!n) return [];
+    const v = typeof b === 'string' ? b : $.s(b);
+    if (v === 'next backdrop') st.costume = (st.costume + 1) % n;
+    else if (v === 'previous backdrop') st.costume = (st.costume - 1 + n) % n;
+    else if (v === 'random backdrop') {
+      // A different one, as in Scratch.
+      if (n > 1) st.costume = (st.costume + 1 + Math.floor(w.random() * (n - 1))) % n;
+    } else lib.costume(st, b);
+    return w.scheduler.trigger('backdrop', st.currentCostume!.name, true);
+  };
   const colorArg = (c: Value) => {
     const rgb = parseColor(c);
     return rgb ? rgbNumber(rgb) : undefined;
@@ -160,16 +175,18 @@ export function createBuiltins(w: World) {
       S.visible = false;
     },
     // sound
-    play_sound(snd: Value) {
+    play_sound(S: Sprite, snd: Value) {
       const s = findByNameOrNumber(w.sounds, snd);
-      if (s) w.audio.playSound(s.id);
+      if (s) w.audio.playSound(s.id, { owner: S.handle, ...S.soundEffects });
     },
-    *play_sound_wait(snd: Value): Waits {
+    *play_sound_wait(S: Sprite, snd: Value): Waits {
       const s = findByNameOrNumber(w.sounds, snd);
       if (!s) return;
-      w.audio.playSound(s.id);
-      // Simulation time, from the rendered length: never ends before the sound does.
-      const until = w.ticks + Math.max(1, Math.ceil(s.seconds * 60 - 1e-9));
+      w.audio.playSound(s.id, { owner: S.handle, ...S.soundEffects });
+      // Simulation time, from the rendered length (shorter when pitched up): never ends before
+      // the sound does.
+      const secs = s.seconds / pitchRate(S.soundEffects.pitch);
+      const until = w.ticks + Math.max(1, Math.ceil(secs * 60 - 1e-9));
       while (w.ticks < until) yield;
     },
     stop_sounds() {
@@ -211,7 +228,7 @@ export function createBuiltins(w: World) {
       return w.input.isDown($.s(key));
     },
     timer(): number {
-      return (w.ticks - w.timerStart) / 60;
+      return w.timer;
     },
     reset_timer() {
       w.timerStart = w.ticks;
@@ -292,6 +309,13 @@ export function createBuiltins(w: World) {
         S.moveTo(x0 + ((x1 - x0) * i) / n, y0 + ((y1 - y0) * i) / n);
       }
     },
+    *glide_to(S: Sprite, secs: Value, id: Value): Waits {
+      let p = target(id);
+      if ($.s(id) === 'random')
+        p = space.fromStagePx(w.random() * space.width, w.random() * space.height);
+      // As in Scratch, a target that doesn't exist does nothing.
+      if (p) yield* lib.glide(S, secs, p.x, p.y);
+    },
     point_towards_sprite(S: Sprite, id: Value) {
       const p = target(id);
       if (p) lib.point_towards(S, p.x, p.y);
@@ -324,15 +348,32 @@ export function createBuiltins(w: World) {
       if (e === 'ghost') S.effects.ghost = clampN(x, 0, 100);
       else if (e === 'brightness') S.effects.brightness = clampN(x, -100, 100);
       else if (e === 'color') S.effects.color = ((x % 200) + 200) % 200;
+      // Scratch leaves the distortions unclamped; their maths bounds them (core/effects.ts).
+      else if (e === 'fisheye' || e === 'whirl' || e === 'pixelate' || e === 'mosaic')
+        S.effects[e] = x;
     },
     change_effect(S: Sprite, name: Value, by: Value) {
       const e = $.s(name).toLowerCase();
-      const cur = e === 'ghost' || e === 'brightness' || e === 'color' ? S.effects[e] : 0;
+      const cur = Object.hasOwn(NO_EFFECTS, e) ? S.effects[e as keyof Effects] : 0;
       lib.set_effect(S, name, cur + $.n(by));
     },
     clear_effects(S: Sprite) {
-      S.effects = { ghost: 0, brightness: 0, color: 0 };
+      S.effects = { ...NO_EFFECTS };
     },
+    // backdrops: the stage's costumes
+    backdrop(b: Value) {
+      switchBackdrop(b);
+    },
+    *backdrop_wait(b: Value): Waits {
+      const threads = switchBackdrop(b);
+      const gens = threads.map((t) => t.gen);
+      while (threads.some((t, i) => t.state !== 'done' && t.gen === gens[i])) yield;
+    },
+    next_backdrop() {
+      switchBackdrop('next backdrop');
+    },
+    backdrop_number: (): number => (w.stage.costumes.length ? w.stage.costume + 1 : 0),
+    backdrop_name: (): string => w.stage.currentCostume?.name ?? '',
     go_to_front(S: Sprite) {
       w.moveLayer(S, Infinity);
     },
@@ -345,6 +386,23 @@ export function createBuiltins(w: World) {
     // sound
     change_volume(by: Value) {
       lib.set_volume(w.volume + $.n(by));
+    },
+    set_sound_effect(S: Sprite, name: Value, v: Value) {
+      const e = $.s(name).toLowerCase();
+      const x = $.n(v);
+      if (e === 'pitch') S.soundEffects.pitch = clampN(x, -360, 360);
+      else if (e === 'pan') S.soundEffects.pan = clampN(x, -100, 100);
+      else return;
+      w.audio.setSoundEffects?.(S.handle, S.soundEffects);
+    },
+    change_sound_effect(S: Sprite, name: Value, by: Value) {
+      const e = $.s(name).toLowerCase();
+      const cur = e === 'pitch' || e === 'pan' ? S.soundEffects[e] : 0;
+      lib.set_sound_effect(S, name, cur + $.n(by));
+    },
+    clear_sound_effects(S: Sprite) {
+      S.soundEffects = { pitch: 0, pan: 0 };
+      w.audio.setSoundEffects?.(S.handle, S.soundEffects);
     },
     // control
     stop_all(): never {
@@ -409,10 +467,38 @@ export function createBuiltins(w: World) {
       const p = space.toStagePx($.n(x), $.n(y));
       return spriteAt(w.sprites, space, p.x, p.y)?.handle ?? '';
     },
+    current(unit: Value): number {
+      const d = new Date(w.wallTime);
+      switch ($.s(unit).toLowerCase()) {
+        case 'year':
+          return d.getFullYear();
+        case 'month':
+          return d.getMonth() + 1;
+        case 'date':
+          return d.getDate();
+        case 'day of week':
+          return d.getDay() + 1;
+        case 'hour':
+          return d.getHours();
+        case 'minute':
+          return d.getMinutes();
+        case 'second':
+          return d.getSeconds();
+      }
+      return 0;
+    },
+    // Scratch's own correction for time zones works out to counting from UTC midnight.
+    days_since_2000: (): number => (w.wallTime - Date.UTC(2000, 0, 1)) / 86_400_000,
+    loudness: (): number => w.loudness,
+    username: (): string => w.username,
+    set_drag_mode(S: Sprite, on: Value) {
+      if (!S.isStage) S.draggable = $.b(on);
+    },
     x_of: (id: Value): number => find(id)?.x ?? 0,
     y_of: (id: Value): number => find(id)?.y ?? 0,
     direction_of: (id: Value): number => find(id)?.direction ?? 0,
     costume_of: (id: Value): number => find(id)?.costume_number ?? 0,
+    size_of: (id: Value): number => find(id)?.size ?? 0,
     var_of(id: Value, name: Value): Value {
       const s = find(id);
       if (!s) return '';
@@ -489,6 +575,10 @@ export function createBuiltins(w: World) {
       const b = Math.min(chars.length, Math.floor($.n(to)));
       return a > b ? '' : chars.slice(a - 1, b).join('');
     },
+    letter_of(i: Value, text: Value): string {
+      const k = Math.floor($.n(i));
+      return lib.substring(text, k, k);
+    },
     upper: (text: Value): string => $.s(text).toUpperCase(),
     lower: (text: Value): string => $.s(text).toLowerCase(),
     format_number: (x: Value, d: Value): string =>
@@ -557,6 +647,21 @@ export function createBuiltins(w: World) {
     change_pen_transparency(S: Sprite, by: Value) {
       lib.set_pen_transparency(S, S.pen.transparency + $.n(by));
     },
+    set_pen_hue(S: Sprite, v: Value) {
+      S.pen.hue = (($.n(v) % 100) + 100) % 100;
+    },
+    set_pen_saturation(S: Sprite, v: Value) {
+      S.pen.saturation = clampN($.n(v), 0, 100);
+    },
+    change_pen_saturation(S: Sprite, by: Value) {
+      lib.set_pen_saturation(S, S.pen.saturation + $.n(by));
+    },
+    set_pen_brightness(S: Sprite, v: Value) {
+      S.pen.brightness = clampN($.n(v), 0, 100);
+    },
+    change_pen_brightness(S: Sprite, by: Value) {
+      lib.set_pen_brightness(S, S.pen.brightness + $.n(by));
+    },
     draw_line(S: Sprite, x1: Value, y1: Value, x2: Value, y2: Value) {
       w.pen.line(S.pen, $.n(x1), $.n(y1), $.n(x2), $.n(y2));
     },
@@ -578,6 +683,9 @@ export function createBuiltins(w: World) {
     // debug
     watch(label: Value, v: Value) {
       w.watches.set($.s(label), $.s(v));
+    },
+    unwatch(label: Value) {
+      w.watches.delete($.s(label));
     },
     assert(cond: Value, message: Value) {
       if (!$.b(cond)) throw new Error(`assertion failed: ${$.s(message)}`);

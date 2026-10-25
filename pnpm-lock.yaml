@@ -143,6 +143,9 @@ importers:
       '@stitch/runtime':
         specifier: workspace:*
         version: link:../runtime
+      '@stitch/sb3':
+        specifier: workspace:*
+        version: link:../sb3
       marked:
         specifier: ^18.1.1
         version: 18.1.1
@@ -239,6 +242,28 @@ importers:
       '@stitch/ir':
         specifier: workspace:*
         version: link:../ir
+
+  packages/sb3:
+    dependencies:
+      '@stitch/cart':
+        specifier: workspace:*
+        version: link:../cart
+      '@stitch/ir':
+        specifier: workspace:*
+        version: link:../ir
+      '@stitch/lang':
+        specifier: workspace:*
+        version: link:../lang
+      fflate:
+        specifier: ^0.8.3
+        version: 0.8.3
+    devDependencies:
+      '@stitch/compiler':
+        specifier: workspace:*
+        version: link:../compiler
+      '@stitch/runtime':
+        specifier: workspace:*
+        version: link:../runtime
 
 packages:
 

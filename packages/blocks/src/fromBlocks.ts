@@ -101,6 +101,25 @@ function topItem(b: BlockJson): TopItem {
       return { id, kind: 'EventScript', event: { type: 'clone' }, body: seq(b.next?.block), ...t };
     case 'stitch_on_click':
       return { id, kind: 'EventScript', event: { type: 'click' }, body: seq(b.next?.block), ...t };
+    case 'stitch_on_backdrop':
+      return {
+        id,
+        kind: 'EventScript',
+        event: { type: 'backdrop', name: field(b, 'NAME') },
+        body: seq(b.next?.block),
+        ...t,
+      };
+    case 'stitch_on_greater': {
+      const value = Math.max(0, Number(b.fields?.VALUE ?? 0)) || 0;
+      const what = b.fields?.WHAT === 'loudness' ? 'loudness' : 'timer';
+      return {
+        id,
+        kind: 'EventScript',
+        event: { type: 'greater', what, value },
+        body: seq(b.next?.block),
+        ...t,
+      };
+    }
     case 'stitch_on_key':
       return {
         id,

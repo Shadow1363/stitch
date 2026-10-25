@@ -1,5 +1,5 @@
 import { decodeTiles, type Cart } from '@stitch/cart';
-import { displayTransform, World, type CostumeInfo } from '@stitch/runtime';
+import { displayTransform, World, type CostumeInfo, type Sprite } from '@stitch/runtime';
 import type { CostumeImage } from '@stitch/runtime/protocol';
 import { logoImage } from './logo';
 
@@ -89,6 +89,8 @@ function drawFrame(
   const world = new World({
     stage: st,
     sprites: cart.sprites,
+    backdrops: cart.backdrops,
+    backdrop: cart.backdrop,
     costumes,
     ...(cart.map
       ? {
@@ -108,6 +110,21 @@ function drawFrame(
   g.rect(0, 0, w, h);
   g.clip();
   g.scale(scale, scale);
+  const draw = (s: Sprite) => {
+    const c = s.currentCostume;
+    const img = c && byId.get(c.id)?.bitmap;
+    if (!s.visible || !c || !img) return;
+    const t = displayTransform(s, c, world.space, c.pixelArt || st.scaling.filter === 'pixel');
+    g.save();
+    g.imageSmoothingEnabled = !(c.pixelArt || st.scaling.filter === 'pixel');
+    g.translate(t.x, t.y);
+    g.rotate(t.rotation);
+    g.scale(t.scale, t.scale);
+    g.drawImage(img, -t.anchorX * c.width, -t.anchorY * c.height);
+    g.restore();
+  };
+  // The backdrop is the stage's costume, under the map and sprites.
+  draw(world.stage);
   const m = world.map;
   const tiles = m && byId.get(m.tileset)?.bitmap;
   if (m && tiles) {
@@ -129,18 +146,6 @@ function drawFrame(
       );
     });
   }
-  for (const s of world.sprites) {
-    const c = s.currentCostume;
-    const img = c && byId.get(c.id)?.bitmap;
-    if (!s.visible || !c || !img) continue;
-    const t = displayTransform(s, c, world.space, c.pixelArt || st.scaling.filter === 'pixel');
-    g.save();
-    g.imageSmoothingEnabled = !(c.pixelArt || st.scaling.filter === 'pixel');
-    g.translate(t.x, t.y);
-    g.rotate(t.rotation);
-    g.scale(t.scale, t.scale);
-    g.drawImage(img, -t.anchorX * c.width, -t.anchorY * c.height);
-    g.restore();
-  }
+  for (const s of world.sprites) draw(s);
   g.restore();
 }

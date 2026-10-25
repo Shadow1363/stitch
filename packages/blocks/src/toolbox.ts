@@ -91,6 +91,8 @@ export function toolbox(catalog: Catalog = CORE_CATALOG) {
         blk('stitch_on_key'),
         blk('stitch_on_message'),
         blk('stitch_on_click'),
+        blk('stitch_on_backdrop'),
+        blk('stitch_on_greater'),
         ...byCategory('events'),
       ]),
       cat('Motion', 'motion_category', [

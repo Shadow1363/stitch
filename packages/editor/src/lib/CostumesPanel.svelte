@@ -5,7 +5,7 @@
   import type { Component } from 'svelte';
   import { fileToDataUrl } from './assets';
   import PixelEditor from './PixelEditor.svelte';
-  import type { Session } from './session';
+  import { STAGE_FILE, type Session } from './session';
   import { thumb } from './thumb';
   import { tell } from './dialog.svelte';
 
@@ -17,7 +17,25 @@
   }
   let { session, spriteId, version, onchange }: Props = $props();
 
-  const sprite = $derived((void version, session.sprite(spriteId)));
+  const isStage = $derived(spriteId === STAGE_FILE);
+  /**
+   * Whose costumes these are: a sprite's, or the stage's backdrops. Both are an id list mutated in
+   * place plus the 1-based one shown at Run.
+   */
+  const sprite = $derived.by((): { costumes: string[]; costume: number } | undefined => {
+    void version;
+    if (spriteId !== STAGE_FILE) return session.sprite(spriteId);
+    return {
+      costumes: session.backdrops,
+      get costume() {
+        return session.backdrop;
+      },
+      set costume(v: number) {
+        session.backdrop = v;
+      },
+    };
+  });
+  const noun = $derived(isStage ? 'backdrop' : 'costume');
   /** A fresh array per change: the costume list is mutated in place, so the strip needs a new value. */
   const costumeIds = $derived((void version, sprite ? [...sprite.costumes] : []));
   let selected = $state(0);
@@ -50,18 +68,26 @@
 
   function insert(asset: Asset, at = (sprite?.costumes.length ?? 0)) {
     if (!sprite) return;
-    const id = session.addAsset(asset, 'costume');
+    const id = session.addAsset(asset, isStage ? 'backdrop' : 'costume');
     sprite.costumes.splice(at, 0, id);
     selected = at;
     onchange('assets');
   }
 
   function addPixel() {
-    const n = newSize;
-    insert({ kind: 'pixel', name: uniqueCostumeName('costume'), width: n, height: n, center: [n / 2, n / 2], layers: encodeLayers(blankImage(n, n)) });
+    // A backdrop fills the stage; its centre goes on the stage's centre.
+    const w = isStage ? session.stage.width : newSize;
+    const h = isStage ? session.stage.height : newSize;
+    insert({ kind: 'pixel', name: uniqueCostumeName(noun), width: w, height: h, center: [w / 2, h / 2], layers: encodeLayers(blankImage(w, h)) });
   }
 
   function addVector() {
+    if (isStage) {
+      const { width: w, height: h } = session.stage;
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="#c2c3c7"/></svg>`;
+      insert({ kind: 'svg', name: uniqueCostumeName(noun), svg, center: [w / 2, h / 2] });
+      return;
+    }
     const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="#4c97ff" stroke="#1d2b53" stroke-width="3"/></svg>';
     insert({ kind: 'svg', name: uniqueCostumeName('drawing'), svg, center: [50, 50] });
   }
@@ -72,11 +98,14 @@
     insert({ ...structuredClone(current), name: uniqueCostumeName(current.name) }, selected + 1);
   }
 
+  /** A sprite keeps at least one costume; the stage may have no backdrop at all. */
+  const minCount = $derived(isStage ? 0 : 1);
+
   function remove() {
-    if (!sprite || !currentId || sprite.costumes.length < 2) return;
+    if (!sprite || !currentId || sprite.costumes.length <= minCount) return;
     sprite.costumes.splice(selected, 1);
     session.dropAssetIfUnused(currentId);
-    if (sprite.costume > sprite.costumes.length) sprite.costume = sprite.costumes.length;
+    if (sprite.costume > sprite.costumes.length) sprite.costume = Math.max(1, sprite.costumes.length);
     onchange('assets');
   }
 
@@ -138,37 +167,42 @@
 
 {#if !sprite}
   <div class="empty">
-    <p>The stage has no costumes. Set its background colour in <b>Cart</b>, and paint a tile map in <b>Map</b>.</p>
+    <p>Pick a sprite to edit its costumes.</p>
   </div>
 {:else}
   <div class="costumes">
-    <div class="strip" aria-label="Costumes (frames)">
+    {#if isStage && !costumeIds.length}
+      <p class="muted">The stage shows its background colour (set in <b>Cart</b>). Add a backdrop to paint behind the map and sprites; scripts switch them with <code>backdrop("name")</code>.</p>
+    {/if}
+    <div class="strip" aria-label={isStage ? 'Backdrops' : 'Costumes (frames)'}>
       {#each costumeIds as id, i (id + i)}
         {@const a = session.assets[id]}
         {#if a}
           <button class="frame" class:sel={i === selected} onclick={() => (selected = i)} title="{i + 1}. {a.name} ({a.kind})">
             <canvas width="64" height="64" use:thumb={{ asset: a, palette: session.palette, version }}></canvas>
             <span>{i + 1}. {a.name}</span>
-            {#if startCostume === i + 1}<em title="Starting costume">start</em>{/if}
+            {#if startCostume === i + 1}<em title={isStage ? 'Starting backdrop' : 'Starting costume'}>start</em>{/if}
           </button>
         {/if}
       {/each}
     </div>
     <div class="actions">
-      <select bind:value={newSize} title="New pixel costume size">
-        {#each [8, 16, 32, 64, 128] as n (n)}<option value={n}>{n}×{n}</option>{/each}
-      </select>
+      {#if !isStage}
+        <select bind:value={newSize} title="New pixel costume size">
+          {#each [8, 16, 32, 64, 128] as n (n)}<option value={n}>{n}×{n}</option>{/each}
+        </select>
+      {/if}
       <button onclick={addPixel}><Plus />Pixel</button>
       <button onclick={addVector}><Plus />Vector</button>
       <label class="file">Import…<input type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml,.svg" onchange={importFile} /></label>
       <span class="gap"></span>
-      <button onclick={duplicate} disabled={!current} title="Copy this costume as the next frame"><Copy />Duplicate</button>
+      <button onclick={duplicate} disabled={!current} title={isStage ? 'Copy this backdrop' : 'Copy this costume as the next frame'}><Copy />Duplicate</button>
       <button onclick={() => moveBy(-1)} disabled={selected === 0} title="Move earlier" aria-label="Move earlier"><ArrowLeft /></button>
       <button onclick={() => moveBy(1)} disabled={selected >= costumeIds.length - 1} title="Move later" aria-label="Move later"><ArrowRight /></button>
-      <button onclick={remove} disabled={costumeIds.length < 2} title="Delete costume" aria-label="Delete costume"><Trash2 /></button>
+      <button onclick={remove} disabled={!current || costumeIds.length <= minCount} title="Delete {noun}" aria-label="Delete {noun}"><Trash2 /></button>
       {#if current}
         <span class="gap"></span>
-        <input class="name" value={current.name} onchange={(e) => rename((e.target as HTMLInputElement).value)} aria-label="Costume name" />
+        <input class="name" value={current.name} onchange={(e) => rename((e.target as HTMLInputElement).value)} aria-label="{isStage ? 'Backdrop' : 'Costume'} name" />
         <button
           onclick={() => {
             sprite.costume = selected + 1;

@@ -16,7 +16,7 @@ import type {
 
 export const GAME_FORMAT = 'stitch-game' as const;
 /** Bump when the shape changes; a player refuses games it doesn't know. */
-export const GAME_VERSION = 2 as const;
+export const GAME_VERSION = 3 as const;
 
 export interface ExportedGame {
   format: typeof GAME_FORMAT;
@@ -27,6 +27,8 @@ export interface ExportedGame {
   code: string;
   stage: StageSettings;
   sprites: SpriteInit[];
+  backdrops: string[];
+  backdrop: number;
   palette: string[];
   assets: Record<string, Asset>;
   map?: TileMap;
@@ -48,6 +50,8 @@ export function gameFromCart(cart: Cart, code: string): ExportedGame {
     code,
     stage: cart.stage,
     sprites: cart.sprites,
+    backdrops: cart.backdrops,
+    backdrop: cart.backdrop,
     palette: cart.palette,
     assets: cart.assets,
     ...(cart.map ? { map: cart.map } : {}),

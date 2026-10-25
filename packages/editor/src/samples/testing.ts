@@ -19,6 +19,8 @@ import { NullAsk, NullRenderer, World, type CostumeInfo, type Program } from '@s
 export interface SampleParts {
   stage: StageSettings;
   sprites: SpriteInit[];
+  backdrops?: string[];
+  backdrop?: number;
   palette: string[];
   assets: Record<string, PixelAsset>;
   map?: TileMap;
@@ -64,10 +66,13 @@ export function runSample(parts: SampleParts, sources: Record<string, string>, s
   );
   if (!r.ok) throw new Error(JSON.stringify(r.diagnostics, null, 1));
   const errors: string[] = [];
+  /** What scripts `print`, in order. */
+  const logs: string[] = [];
   const m = parts.map;
   const world = new World({
     stage: parts.stage,
     sprites: parts.sprites,
+    ...(parts.backdrops ? { backdrops: parts.backdrops, backdrop: parts.backdrop ?? 1 } : {}),
     costumes: costumes(parts),
     ...(m
       ? {
@@ -89,6 +94,7 @@ export function runSample(parts: SampleParts, sources: Record<string, string>, s
     ask: new NullAsk(),
     seed,
     onError: (e) => errors.push(`${e.sprite} ${e.event}: ${String(e.error)}`),
+    onLog: (_sprite, text) => logs.push(text),
   });
   world.load(new Function('rt', r.code) as Program);
   world.start();
@@ -101,5 +107,5 @@ export function runSample(parts: SampleParts, sources: Record<string, string>, s
   };
   const sprite = (name: string) => world.all.find((s) => s.name === name)!;
   const G = world.globals as Record<string, unknown>;
-  return { world, errors, tick, sprite, G, diagnostics: r.diagnostics };
+  return { world, errors, logs, tick, sprite, G, diagnostics: r.diagnostics };
 }

@@ -2,11 +2,11 @@
   import { Play, Redo2, Trash2, Undo2 } from '@lucide/svelte';
   import SplitPane from './SplitPane.svelte';
   import { DEFAULT_SFX, SFX_PARAMS, SFX_PRESETS, SFX_WAVES, sfxMutate, sfxPreset, sfxRandomize, type SfxParams, type SfxPreset, type Sound } from '@stitch/cart';
-  import { encodeWav, SFX_RATE } from '@stitch/cart/audio';
+  import { encodeWav } from '@stitch/cart/audio';
   import { download } from './files';
   import type { Session } from './session';
   import { uniqueName } from './session';
-  import { preview, soundSamples } from './sound';
+  import { preview, soundClip } from './sound';
   import { token } from './theme';
   import { themeVersion } from './theme-version.svelte';
   import { ask } from './dialog.svelte';
@@ -27,15 +27,16 @@
   const list = $derived.by(() => (void version, void rev, Object.entries(session.sounds).map(([id, s]) => ({ id, name: s.name }))));
   const currentId = $derived(selectedId && session.sounds[selectedId] ? selectedId : list[0]?.id);
   const current: Sound | undefined = $derived((void version, void rev, currentId ? session.sounds[currentId] : undefined));
-  /** A copy, so sliders see each change. */
-  const params = $derived(current ? { ...current.params } : undefined);
-  const seconds = $derived(current ? soundSamples(current).length / SFX_RATE : 0);
+  /** A copy, so sliders see each change. Recorded sounds have no parameters. */
+  const params = $derived(current?.kind === 'sfx' ? { ...current.params } : undefined);
+  const clip = $derived(current ? soundClip(current.kind === 'sfx' ? { ...current, params: { ...current.params } } : current) : undefined);
+  const seconds = $derived(clip ? clip.samples.length / clip.rate : 0);
   const groups = $derived([...new Set(SFX_PARAMS.map((p) => p.group))]);
 
   let canvas = $state<HTMLCanvasElement>();
   $effect(() => {
     void themeVersion();
-    if (canvas && current) drawWave(canvas, soundSamples({ ...current, params: { ...current.params } }));
+    if (canvas && clip) drawWave(canvas, clip.samples);
   });
 
   const seed = () => (Math.random() * 2 ** 32) >>> 0;
@@ -46,12 +47,15 @@
   }
 
   function play() {
-    if (current) preview(soundSamples(current), SFX_RATE);
+    if (current) {
+      const c = soundClip(current);
+      preview(c.samples, c.rate);
+    }
   }
 
   /** Records the current parameters for undo, then applies `next` and plays it (as sfxr). */
   function setParams(next: SfxParams, sound = true) {
-    if (!current || !currentId) return;
+    if (current?.kind !== 'sfx' || !currentId) return;
     undoStack.push({ id: currentId, params: { ...current.params } });
     if (undoStack.length > 200) undoStack.shift();
     redoStack = [];
@@ -88,7 +92,7 @@
   function step(from: typeof undoStack, to: typeof undoStack) {
     const e = from.pop();
     const s = e && session.sounds[e.id];
-    if (!e || !s) return;
+    if (!e || s?.kind !== 'sfx') return;
     to.push({ id: e.id, params: { ...s.params } });
     s.params = e.params;
     selectedId = e.id;
@@ -112,7 +116,8 @@
 
   function exportWav() {
     if (!current) return;
-    const wav = encodeWav(soundSamples(current), SFX_RATE);
+    const c = soundClip(current);
+    const wav = encodeWav(c.samples, c.rate);
     download(new Blob([wav as Uint8Array<ArrayBuffer>], { type: 'audio/wav' }), `${current.name}.wav`);
   }
 
@@ -165,12 +170,13 @@
       </aside>
     {/snippet}
     {#snippet b()}
-      {#if current && params}
+      {#if current}
         <div class="edit">
           <div class="bar">
             <input class="name" type="text" value={current.name} onchange={(e) => rename((e.target as HTMLInputElement).value)} aria-label="Sound name" title="Scripts play it by this name" />
             <button class="go" onclick={play} title="Play (Space)"><Play />Play</button>
             <span class="gap"></span>
+            {#if current.kind === 'sfx'}
             {#each SFX_PRESETS as p (p)}
               <button onclick={() => setParams(sfxPreset(p, seed()))} title="Replace with a new {p} sound">{label(p)}</button>
             {/each}
@@ -180,18 +186,25 @@
             <span class="gap"></span>
             <button onclick={() => step(undoStack, redoStack)} title="Undo (⌘Z)" aria-label="Undo"><Undo2 /></button>
             <button onclick={() => step(redoStack, undoStack)} title="Redo (⇧⌘Z)" aria-label="Redo"><Redo2 /></button>
+            {:else}
+            <span class="muted">Recorded sound, {clip?.rate ?? 0} Hz</span>
+            <span class="gap"></span>
+            {/if}
             <button onclick={exportWav}>Export WAV</button>
             <button onclick={remove} title="Delete sound" aria-label="Delete sound"><Trash2 /></button>
           </div>
           <div class="wave-row">
+            {#if current.kind === 'sfx' && params}
             <div class="seg" role="radiogroup" aria-label="Wave">
               {#each SFX_WAVES as w (w)}
                 <button role="radio" aria-checked={params.wave === w} class:on={params.wave === w} onclick={() => setParams({ ...current.params, wave: w })}>{w}</button>
               {/each}
             </div>
+            {/if}
             <canvas bind:this={canvas} width="360" height="48" aria-label="Waveform"></canvas>
             <span class="muted">{seconds.toFixed(2)} s</span>
           </div>
+          {#if current.kind === 'sfx' && params}
           <div class="sliders">
             {#each groups as g (g)}
               <fieldset>
@@ -213,6 +226,7 @@
               </fieldset>
             {/each}
           </div>
+          {/if}
         </div>
       {/if}
     {/snippet}

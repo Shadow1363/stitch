@@ -67,7 +67,7 @@
     >
     <div class="row">
       <button class="primary" onclick={onsave}><Download />Save .stitch.png</button>
-      <label class="file">Open file…<input type="file" accept=".png,.json,image/png,application/json" onchange={(e) => { const f = (e.target as HTMLInputElement).files?.[0]; (e.target as HTMLInputElement).value = ''; if (f) onopen(f); }} /></label>
+      <label class="file" title="Opens a .stitch.png cart, cart JSON, or a Scratch 3 project (.sb3)">Open file…<input type="file" accept=".png,.json,.sb3,image/png,application/json,application/x.scratch.sb3" onchange={(e) => { const f = (e.target as HTMLInputElement).files?.[0]; (e.target as HTMLInputElement).value = ''; if (f) onopen(f); }} /></label>
       <button onclick={openUrl}>Open URL…</button>
     </div>
     <div class="row">

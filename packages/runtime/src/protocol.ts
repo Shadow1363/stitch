@@ -6,13 +6,16 @@ import type { CostumeImage } from './pixi/textures';
 import type { RendererPreference } from './pixi/stage';
 
 /** Bump on any message shape change; both sides check it in load/ready. */
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
 
 export interface LoadPayload {
   /** Compiled program: body of `new Function('rt', code)`. */
   code: string;
   stage: StageSettings;
   sprites: SpriteInit[];
+  /** The stage's backdrops (ids into `costumes`) and the 1-based one shown at Run. */
+  backdrops: string[];
+  backdrop: number;
   /** Transferred; the sandbox never fetches assets itself. Includes the map's tileset. */
   costumes: CostumeImage[];
   map?: MapInit;
@@ -41,6 +44,8 @@ export type ToStage =
   /** Freezes or continues the running program (simulation ticks and sound). */
   | { t: 'pause'; paused: boolean }
   | { t: 'ping'; n: number }
+  /** Microphone level 0–100 (-1: none), measured by the editor while a cart uses loudness. */
+  | { t: 'loudness'; level: number }
   /** The editor's answer to an `http` request. */
   | ({ t: 'http-result'; id: number } & HttpResponse);
 

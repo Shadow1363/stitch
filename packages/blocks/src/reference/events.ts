@@ -61,5 +61,27 @@ end`,
 end`,
       alt: 'when this sprite clicked: say Ouch! for 1 seconds',
     },
+    {
+      id: 'on-backdrop',
+      title: '`on backdrop "b" do … end` — when backdrop switches to',
+      snippet: 'on backdrop "${backdrop1}" do\n\t${}\nend',
+      keywords: ['backdrop'],
+      doc: 'Runs when the stage switches to the backdrop with this name, from [`backdrop`](#backdropbackdrop--command), `backdrop_wait` or `next_backdrop`.',
+      example: `on backdrop "night" do
+  show()
+end`,
+      alt: 'when backdrop switches to night: show',
+    },
+    {
+      id: 'on-greater',
+      title: '`on timer > n do … end` — when timer or loudness is more than',
+      snippet: 'on ${timer} > ${10} do\n\t${}\nend',
+      keywords: ['timer', 'loudness'],
+      doc: 'Runs once each time the [timer](#timer--reporter) or the microphone [loudness](#loudness--reporter) rises above `n`. It runs again only after the value drops back to `n` or below and rises again, as in Scratch. `n` is a plain number.',
+      example: `on timer > 5 do
+  say("Five seconds!")
+end`,
+      alt: 'when timer > 5: say Five seconds!',
+    },
   ],
 };

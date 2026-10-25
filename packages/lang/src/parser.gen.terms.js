@@ -73,4 +73,9 @@ export const
   CloneEvent = 76,
   clone = 77,
   ClickEvent = 78,
-  click = 79
+  click = 79,
+  GreaterEvent = 80,
+  timer = 81,
+  loudness = 82,
+  BackdropEvent = 83,
+  backdrop = 84

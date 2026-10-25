@@ -18,11 +18,34 @@ export interface CostumeInfo {
 
 export type RotationStyle = 'all around' | 'left-right' | "don't rotate";
 
-/** Graphic effects, on Scratch's scales: ghost 0–100, brightness -100–100, colour wraps at 200. */
+/**
+ * Graphic effects, on Scratch's scales: ghost 0–100, brightness -100–100, colour wraps at 200.
+ * Fisheye, whirl, pixelate and mosaic distort the costume (see `core/effects.ts`).
+ */
 export interface Effects {
   ghost: number;
   brightness: number;
   color: number;
+  fisheye: number;
+  whirl: number;
+  pixelate: number;
+  mosaic: number;
+}
+
+export const NO_EFFECTS: Readonly<Effects> = {
+  ghost: 0,
+  brightness: 0,
+  color: 0,
+  fisheye: 0,
+  whirl: 0,
+  pixelate: 0,
+  mosaic: 0,
+};
+
+/** Sound effects, on Scratch's scales: pitch ±360 (10 a semitone), pan -100 (left) to 100. */
+export interface SoundEffects {
+  pitch: number;
+  pan: number;
 }
 
 /** Pen settings on Scratch's 0–100 scales (hue, saturation, brightness, transparency). */
@@ -49,7 +72,10 @@ export class Sprite {
   /** The bubble is a thought rather than speech. */
   thinking = false;
   rotationStyle: RotationStyle = 'all around';
-  effects: Effects = { ghost: 0, brightness: 0, color: 0 };
+  effects: Effects = { ...NO_EFFECTS };
+  soundEffects: SoundEffects = { pitch: 0, pan: 0 };
+  /** Set by `set_drag_mode`: the mouse can drag the sprite around the stage. */
+  draggable = false;
   pen: PenState = {
     down: false,
     hue: 66.66,

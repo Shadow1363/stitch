@@ -101,6 +101,44 @@ describe('cart', () => {
     expect(cart.music).toEqual(emptyMusic());
   });
 
+  it('migrates v5 carts to no backdrops, and keeps valid backdrops', () => {
+    const old = normalizeCart({ format: 'stitch-cart', version: 5, project });
+    expect([old.backdrops, old.backdrop]).toEqual([[], 1]);
+    const cart = normalizeCart({
+      format: 'stitch-cart',
+      version: 6,
+      project,
+      backdrops: ['a', 'b'],
+      backdrop: 2,
+    });
+    expect([cart.backdrops, cart.backdrop]).toEqual([['a', 'b'], 2]);
+    const bad = normalizeCart({
+      format: 'stitch-cart',
+      version: 6,
+      project,
+      backdrops: [1],
+      backdrop: 0,
+    });
+    expect([bad.backdrops, bad.backdrop]).toEqual([[], 1]);
+  });
+
+  it('keeps valid recorded sounds and drops broken ones', () => {
+    const cart = normalizeCart({
+      format: 'stitch-cart',
+      version: 6,
+      project,
+      sounds: {
+        ok: { kind: 'sample', name: 'meow', rate: 22050, data: 'AAA=' },
+        fast: { kind: 'sample', name: 'f', rate: 96000, data: 'AAA=' },
+        empty: { kind: 'sample', name: 'e', rate: 22050 },
+      },
+    });
+    expect(cart.version).toBe(7);
+    expect(cart.sounds).toEqual({
+      ok: { kind: 'sample', name: 'meow', rate: 22050, data: 'AAA=' },
+    });
+  });
+
   it('fills and clamps sound parameters', () => {
     const cart = normalizeCart({
       format: 'stitch-cart',

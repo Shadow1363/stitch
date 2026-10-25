@@ -1,0 +1,14 @@
+{
+  "name": "@stitch/sb3",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@stitch/cart": "workspace:*",
+    "@stitch/ir": "workspace:*",
+    "@stitch/lang": "workspace:*",
+    "fflate": "^0.8.3"
+  },
+  "devDependencies": { "@stitch/compiler": "workspace:*", "@stitch/runtime": "workspace:*" }
+}

@@ -39,12 +39,30 @@ export interface SfxParams {
 
 export type SfxNumericParam = Exclude<keyof SfxParams, 'wave'>;
 
-/** A named sound in the cart. `kind` leaves room for recorded samples later. */
-export interface Sound {
+/** A sound effect made from sfxr parameters. */
+export interface SfxSound {
   kind: 'sfx';
   name: string;
   params: SfxParams;
 }
+
+/**
+ * A recorded sound (from a Scratch import, for now): mono 16-bit PCM, little-endian, base64. Kept
+ * as plain PCM rather than WAV or MP3 so decoding is pure and players need no codec.
+ */
+export interface SampleSound {
+  kind: 'sample';
+  name: string;
+  /** Samples per second, at most MAX_SAMPLE_RATE. */
+  rate: number;
+  data: string;
+}
+
+/** A named sound in the cart. */
+export type Sound = SfxSound | SampleSound;
+
+/** Highest rate a recorded sound is stored at; faster sources are resampled down. */
+export const MAX_SAMPLE_RATE = 48000;
 
 /** Slider metadata, in editor order. */
 export const SFX_PARAMS: readonly {

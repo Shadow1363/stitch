@@ -49,6 +49,15 @@ export class StageRunner {
   started = false;
   private loop: ReturnType<typeof createLoop> | undefined;
 
+  /** Microphone level for `loudness`, kept across Runs: -1 until something measures it. */
+  private loudness = -1;
+
+  /** The latest microphone level (0–100), from the editor or the player's own microphone. */
+  setLoudness(level: number): void {
+    this.loudness = level;
+    if (this.world) this.world.loudness = level;
+  }
+
   get paused(): boolean {
     return this.loop?.paused ?? false;
   }
@@ -162,6 +171,8 @@ export class StageRunner {
     const w = new World({
       stage: payload.stage,
       sprites: payload.sprites,
+      backdrops: payload.backdrops,
+      backdrop: payload.backdrop,
       costumes: this.costumeInfo,
       ...(payload.map ? { map: payload.map } : {}),
       sounds: payload.sounds.map((c) => ({
@@ -177,6 +188,7 @@ export class StageRunner {
       onLog: this.opts.onLog,
       onError: (e) => this.error(e.sprite, e.event, e.error),
     });
+    w.loudness = this.loudness;
     try {
       w.load(program);
     } catch (err) {

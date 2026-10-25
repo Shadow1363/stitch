@@ -44,6 +44,9 @@
   export function httpResult(id: number, res: HttpResponse) {
     client?.httpResult(id, res);
   }
+  export function loudness(level: number) {
+    client?.loudness(level);
+  }
 </script>
 
 <svelte:document onfullscreenchange={() => (full = document.fullscreenElement === frame)} />

@@ -202,6 +202,8 @@ async function inSandbox() {
           code,
           stage: { ...DEFAULT_STAGE, background: '#1d2330', cloneLimit: N },
           sprites,
+          backdrops: [],
+          backdrop: 1,
           costumes: [await ballImage()],
           sounds: [],
           songs: [],

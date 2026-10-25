@@ -52,6 +52,7 @@ export const NAV: readonly { group: string; pages: string[] }[] = [
     pages: [
       'docs/reference.md',
       'docs/extensions.md',
+      'docs/import-scratch.md',
       'docs/export.md',
       'docs/network.md',
       'docs/cart-format.md',

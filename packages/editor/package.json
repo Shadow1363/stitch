@@ -27,6 +27,7 @@
     "@stitch/ir": "workspace:*",
     "@stitch/lang": "workspace:*",
     "@stitch/runtime": "workspace:*",
+    "@stitch/sb3": "workspace:*",
     "marked": "^18.1.1",
     "paper": "^0.16.0",
     "pixi.js": "^8.22.0",

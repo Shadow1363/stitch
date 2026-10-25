@@ -88,7 +88,15 @@ function topItem(it: TopItem): BlockJson {
           ? { type: 'stitch_on_key', id: it.id, fields: { KEY: ev.key } }
           : ev.type === 'message'
             ? { type: 'stitch_on_message', id: it.id, fields: { MSG: ev.name } }
-            : { type: `stitch_on_${ev.type}`, id: it.id };
+            : ev.type === 'backdrop'
+              ? { type: 'stitch_on_backdrop', id: it.id, fields: { NAME: ev.name } }
+              : ev.type === 'greater'
+                ? {
+                    type: 'stitch_on_greater',
+                    id: it.id,
+                    fields: { WHAT: ev.what, VALUE: ev.value },
+                  }
+                : { type: `stitch_on_${ev.type}`, id: it.id };
       return withComment({ ...head, ...chainAsNext(it.body) }, it.trivia);
     }
     case 'Raw':

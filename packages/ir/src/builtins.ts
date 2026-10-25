@@ -6,7 +6,17 @@ export type ValueType = 'number' | 'string' | 'boolean' | 'list' | 'any';
 
 /** What a string argument names, so the editor can complete it and lint unknown names. */
 export type ParamRef =
-  'sprite' | 'costume' | 'sound' | 'song' | 'message' | 'key' | 'effect' | 'rotation';
+  | 'sprite'
+  | 'costume'
+  | 'backdrop'
+  | 'sound'
+  | 'song'
+  | 'message'
+  | 'key'
+  | 'effect'
+  | 'rotation'
+  | 'sound_effect'
+  | 'time_unit';
 
 export interface BuiltinParam {
   name: string;
@@ -142,13 +152,21 @@ const list: Builtin[] = [
   { name: 'show', kind: 'command', category: 'looks', params: [], sprite: true },
   { name: 'hide', kind: 'command', category: 'looks', params: [], sprite: true },
   // sound (by name, or 1-based number in cart order)
-  { name: 'play_sound', kind: 'command', category: 'sound', params: [ref(a('sound'), 'sound')] },
+  // The sprite plays it, so its pitch and pan effects apply.
+  {
+    name: 'play_sound',
+    kind: 'command',
+    category: 'sound',
+    params: [ref(a('sound'), 'sound')],
+    sprite: true,
+  },
   {
     name: 'play_sound_wait',
     kind: 'command',
     category: 'sound',
     params: [ref(a('sound'), 'sound')],
     yields: true,
+    sprite: true,
   },
   { name: 'stop_sounds', kind: 'command', category: 'sound', params: [] },
   { name: 'play_music', kind: 'command', category: 'sound', params: [ref(a('song'), 'song')] },
@@ -262,6 +280,7 @@ const list: Builtin[] = [
   cmd('motion', 'goto_random', [], S),
   cmd('motion', 'goto_sprite', [ref(s('sprite'), 'sprite')], S),
   cmd('motion', 'glide', [n('seconds'), n('x'), n('y')], { ...S, ...W }),
+  cmd('motion', 'glide_to', [n('seconds'), ref(s('sprite'), 'sprite')], { ...S, ...W }),
   cmd('motion', 'point_towards_sprite', [ref(s('sprite'), 'sprite')], S),
   cmd('motion', 'rotation_style', [ref(s('style'), 'rotation')], S),
   // looks
@@ -274,8 +293,17 @@ const list: Builtin[] = [
   cmd('looks', 'go_to_front', [], S),
   cmd('looks', 'go_to_back', [], S),
   cmd('looks', 'change_layer', [n('by')], S),
+  // backdrops (Phase 14): the stage's costumes
+  cmd('looks', 'backdrop', [ref(a('backdrop'), 'backdrop')]),
+  cmd('looks', 'backdrop_wait', [ref(a('backdrop'), 'backdrop')], W),
+  cmd('looks', 'next_backdrop', []),
+  rep('looks', 'backdrop_number', [], 'number'),
+  rep('looks', 'backdrop_name', [], 'string'),
   // sound
   cmd('sound', 'change_volume', [n('by')]),
+  cmd('sound', 'set_sound_effect', [ref(s('effect'), 'sound_effect'), n('value')], S),
+  cmd('sound', 'change_sound_effect', [ref(s('effect'), 'sound_effect'), n('by')], S),
+  cmd('sound', 'clear_sound_effects', [], S),
   // control
   cmd('control', 'stop_all', []),
   cmd('control', 'stop_other_scripts', [], S),
@@ -303,8 +331,14 @@ const list: Builtin[] = [
   rep('sensing', 'y_of', [ref(s('sprite'), 'sprite')], 'number'),
   rep('sensing', 'direction_of', [ref(s('sprite'), 'sprite')], 'number'),
   rep('sensing', 'costume_of', [ref(s('sprite'), 'sprite')], 'number'),
+  rep('sensing', 'size_of', [ref(s('sprite'), 'sprite')], 'number'),
   rep('sensing', 'var_of', [ref(s('sprite'), 'sprite'), s('variable')], 'any'),
   rep('sensing', 'delta_time', [], 'number'),
+  rep('sensing', 'current', [ref(s('unit'), 'time_unit')], 'number'),
+  rep('sensing', 'days_since_2000', [], 'number'),
+  rep('sensing', 'loudness', [], 'number'),
+  rep('sensing', 'username', [], 'string'),
+  cmd('sensing', 'set_drag_mode', [bo('draggable')], S),
   // map by cell (columns and rows from 1)
   rep('map', 'map_cell', [n('column'), n('row')], 'number'),
   cmd('map', 'set_map_cell', [n('column'), n('row'), n('tile')]),
@@ -330,6 +364,7 @@ const list: Builtin[] = [
   rep('strings', 'split', [s('text'), s('separator')], 'list'),
   rep('strings', 'join', [l('list'), s('separator')], 'string'),
   rep('strings', 'substring', [s('text'), n('from'), n('to')], 'string'),
+  rep('strings', 'letter_of', [n('index'), s('text')], 'string'),
   rep('strings', 'upper', [s('text')], 'string'),
   rep('strings', 'lower', [s('text')], 'string'),
   rep('strings', 'format_number', [n('x'), n('decimals')], 'string'),
@@ -356,6 +391,11 @@ const list: Builtin[] = [
   cmd('pen', 'change_pen_size', [n('by')], S),
   cmd('pen', 'set_pen_transparency', [n('percent')], S),
   cmd('pen', 'change_pen_transparency', [n('by')], S),
+  cmd('pen', 'set_pen_hue', [n('hue')], S),
+  cmd('pen', 'set_pen_saturation', [n('percent')], S),
+  cmd('pen', 'change_pen_saturation', [n('by')], S),
+  cmd('pen', 'set_pen_brightness', [n('percent')], S),
+  cmd('pen', 'change_pen_brightness', [n('by')], S),
   cmd('pen', 'draw_line', [n('x1'), n('y1'), n('x2'), n('y2')], S),
   cmd('pen', 'draw_rect', [n('x1'), n('y1'), n('x2'), n('y2')], S),
   cmd('pen', 'fill_rect', [n('x1'), n('y1'), n('x2'), n('y2')], S),
@@ -364,6 +404,7 @@ const list: Builtin[] = [
   cmd('pen', 'draw_text', [a('text'), n('x'), n('y')], S),
   // debug
   cmd('debug', 'watch', [s('label'), a('value')]),
+  cmd('debug', 'unwatch', [s('label')]),
   cmd('debug', 'assert', [bo('condition'), a('message')]),
   // ---- editor tooling (Phase 11) ----
   cmd('sensing', 'ask', [a('question')], { ...S, ...W }),

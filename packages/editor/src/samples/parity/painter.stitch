@@ -1,0 +1,18 @@
+-- Paints a colour wheel with the pen's hue, saturation and brightness, then a clock in the
+-- corner from the computer's time.
+on message "demo" do
+  goto(-60, 20)
+  set_pen_size(3)
+  for ring = 1, 4 do
+    set_pen_saturation(ring * 25)
+    set_pen_brightness(100 - ring * 10)
+    for step = 0, 35 do
+      set_pen_hue(step * 100 / 36)
+      fill_circle(-60 + ring * 6 * sin(step * 10), 20 + ring * 6 * cos(step * 10), 2)
+    end
+  end
+  forever do
+    watch("time", current("hour") .. ":" .. current("minute") .. ":" .. current("second"))
+    wait(1)
+  end
+end

@@ -91,9 +91,13 @@ function event(e: EventSpec): string {
       return `key ${escapeString(e.key)}`;
     case 'message':
       return `message ${escapeString(e.name)}`;
+    case 'backdrop':
+      return `backdrop ${escapeString(e.name)}`;
     case 'clone':
     case 'click':
       return e.type;
+    case 'greater':
+      return `${e.what} > ${numberText(e.value)}`;
   }
 }
 

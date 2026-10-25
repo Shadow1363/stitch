@@ -122,6 +122,12 @@ end`,
       alt: 'switch costume to costume # of Player',
     },
     {
+      id: 'size_of',
+      doc: "Another sprite's size, in percent.",
+      example: `size = size_of("Player")`,
+      alt: 'set size to size of Player',
+    },
+    {
       id: 'var_of',
       doc: 'Another sprite\'s variable (its own `var`, then its `shared var`). For `"stage"`, a stage or global variable. `""` when there\'s none.',
       example: `if var_of("Player", "hp") <= 0 then
@@ -161,6 +167,43 @@ end`,
 end`,
       alt: 'if y > stage height / 2 then set y to -stage height / 2',
       scope: 'global',
+    },
+    {
+      id: 'current',
+      doc: 'Part of the date or time on this computer: `"year"`, `"month"` (1–12), `"date"`, `"day of week"` (1 is Sunday), `"hour"`, `"minute"` or `"second"`. Read once at the start of each tick, so a run that uses it doesn\'t replay the same way ([D33](departures.md)).',
+      example: `say(current("hour") .. ":" .. current("minute"))`,
+      alt: 'say join current hour : current minute',
+    },
+    {
+      id: 'days_since_2000',
+      doc: 'Days since midnight UTC on 1 January 2000, with a fraction for the time of day, as in Scratch ([D33](departures.md)).',
+      example: `say(floor(days_since_2000()))`,
+      alt: 'say floor of days since 2000',
+      scope: 'global',
+    },
+    {
+      id: 'loudness',
+      doc: "The microphone's level, 0–100. The editor asks before it turns the microphone on, and only for a cart that uses loudness; until then, or with no microphone, it's -1 ([D34](departures.md)).",
+      example: `if loudness() > 30 then
+  say("Shh!")
+end`,
+      alt: 'if loudness > 30 then say Shh!',
+      scope: 'global',
+    },
+    {
+      id: 'username',
+      doc: 'Always `""`: Stitch has no accounts, and Scratch reports `""` when nobody is signed in.',
+      example: `if username() == "" then
+  say("Hello, stranger!")
+end`,
+      alt: 'if username = (empty) then say Hello, stranger!',
+      scope: 'global',
+    },
+    {
+      id: 'set_drag_mode',
+      doc: 'With `true`, the mouse can drag this sprite around the stage (it comes to the front). Off by default, in the editor too ([D35](departures.md)).',
+      example: `set_drag_mode(true)`,
+      alt: 'set draggable true',
     },
   ],
 };

@@ -92,6 +92,12 @@ end`,
       alt: 'glide 1 secs to x 100 y 0',
     },
     {
+      id: 'glide_to',
+      doc: 'Glides to another sprite, `"mouse"` or `"random"` (a random spot on stage) over `seconds`. A sprite that doesn\'t exist does nothing.',
+      example: `glide_to(1, "mouse")`,
+      alt: 'glide 1 secs to mouse',
+    },
+    {
       id: 'point_towards_sprite',
       doc: 'Turns to face another sprite (or `"mouse"`).',
       example: `point_towards_sprite("Player")`,

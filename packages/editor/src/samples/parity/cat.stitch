@@ -1,0 +1,60 @@
+-- The cat glides for the Checker, then shows off: drag it around, and it cycles through the
+-- graphic effects that bend its costume.
+var touched = false
+
+on message "glide test" do
+  glide_to(0.25, "Target")
+  touched = touching("Target")
+end
+
+on message "go home" do
+  goto(0, 0)
+end
+
+on message "demo" do
+  set_drag_mode(true)
+  say_for("Drag me!", 2)
+  forever do
+    for effect in ["fisheye", "whirl", "pixelate", "mosaic", "color", "ghost"] do
+      say(effect)
+      repeat 20 do
+        change_effect(effect, 5)
+      end
+      wait(0.5)
+      clear_effects()
+    end
+  end
+end
+
+on key "space" do
+  play_sound("blip")
+end
+
+on key "up" do
+  change_sound_effect("pitch", 30)
+  say_for("pitch up", 0.5)
+end
+
+on key "down" do
+  change_sound_effect("pitch", -30)
+  say_for("pitch down", 0.5)
+end
+
+on key "left" do
+  change_sound_effect("pan", -50)
+  say_for("pan left", 0.5)
+end
+
+on key "right" do
+  change_sound_effect("pan", 50)
+  say_for("pan right", 0.5)
+end
+
+on key "c" do
+  clear_sound_effects()
+  say_for("sound effects off", 0.5)
+end
+
+on loudness > 30 do
+  say_for("Loud!", 1)
+end
