@@ -127,6 +127,9 @@ export function colorBelow(
   const m = bg.map;
   const ts = bg.tileset;
   if (m && ts?.pixels) {
+    // The map scrolls under the stage; everything below is in map pixels.
+    px += m.scroll.x;
+    py += m.scroll.y;
     const col = Math.floor(px / m.tileSize);
     const row = Math.floor(py / m.tileSize);
     if (col >= 0 && row >= 0 && col < m.width && row < m.height) {

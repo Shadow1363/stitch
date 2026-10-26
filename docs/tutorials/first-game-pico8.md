@@ -93,7 +93,7 @@ Open **Sounds** and, under **New sound**, click **Blip**. That makes `blip1`, an
 
 ## 6. Run it
 
-Press **Run**, click the stage, and walk around. Walls stop you; each stone you step on turns to grass and prints a gem count. Press **Stop** to stop, and **Run** again to restart from the cart's starting state.
+Press **Run**, click the stage, and walk around. Walls stop you; each stone you step on turns to grass and prints a gem count. Press **Stop** to stop, and **Run** again to restart from the cart's starting state. The keys are ⌘↩ for Run, ⌘P for Pause and ⌘. for Stop (Ctrl on Windows and Linux), and they work while the stage has the keyboard too.
 
 ## 7. Save the cart
 

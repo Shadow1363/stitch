@@ -345,6 +345,10 @@ const list: Builtin[] = [
   rep('map', 'map_width', [], 'number'),
   rep('map', 'map_height', [], 'number'),
   rep('map', 'tile_size', [], 'number'),
+  // map camera (the map pixel at the stage's top-left)
+  cmd('map', 'scroll_map', [n('x'), n('y')]),
+  rep('map', 'map_x', [], 'number'),
+  rep('map', 'map_y', [], 'number'),
   // math
   rep('math', 'random_int', [n('from'), n('to')], 'number'),
   cmd('math', 'set_seed', [n('seed')]),

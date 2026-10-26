@@ -1,0 +1,220 @@
+-- Pip, the hero. Arrow keys or WASD to walk; Z or Space to poke with the Needle.
+-- Pip's x and y are stage pixels, like every sprite's. The map scrolls under the stage, so
+-- `tile_at(x, y)` is always the tile under Pip, whichever room is showing.
+-- Ticks left of being knocked back, and which way.
+var knock = 0
+var knock_x = 0
+var knock_y = 0
+-- Ticks left of flashing after a hit, when Lint can't hurt Pip again.
+var safe = 0
+
+on start do
+  hide()
+  rotation_style("left-right")
+end
+
+on message "spawn" do
+  goto(start_x - map_x(), start_y - map_y())
+  knock = 0
+  safe = 0
+  clear_effects()
+  face(180)
+  costume("down1")
+  show()
+end
+
+on start do
+  forever do
+    if state == "play" then
+      if bumped then
+        bumped = false
+        hurt()
+      end
+      if knock > 0 then
+        knock -= 1
+        -- Knocked back, Pip stops at the stage's edge rather than leaving the room.
+        if on_stage(x + knock_x * 6, y + knock_y * 6) then
+          step(knock_x * 2, knock_y * 2)
+        end
+      elseif swing > 0 then
+        swing -= 1
+      else
+        walk()
+        poke()
+      end
+      flash()
+      check_thimble()
+    end
+  end
+end
+
+-- One arrow at a time: across first, then up and down, like the old games.
+function walk()
+  local dx = 0
+  local dy = 0
+  if key_down("left") or key_down("a") then
+    dx = -1
+  elseif key_down("right") or key_down("d") then
+    dx = 1
+  elseif key_down("up") or key_down("w") then
+    dy = -1
+  elseif key_down("down") or key_down("s") then
+    dy = 1
+  end
+  if dx ~= 0 then
+    face(90 * dx)
+  elseif dy ~= 0 then
+    face(90 + 90 * dy)
+  end
+  if dx ~= 0 or dy ~= 0 then
+    step(dx, dy)
+    animate()
+    check_edges()
+  end
+end
+
+-- Turns Pip to a direction, with the costume for it. Side costumes face right and flip for left.
+function face(d)
+  facing = d
+  if d == 0 then
+    point(90)
+    costume("up" .. frame())
+  elseif d == 180 then
+    point(90)
+    costume("down" .. frame())
+  else
+    point(d)
+    costume("side" .. frame())
+  end
+end
+
+-- 1 or 2: which walking frame the costume shows now.
+function frame()
+  return floor(frame_count() / 8) % 2 + 1
+end
+
+function animate()
+  face(facing)
+end
+
+function poke()
+  if key_pressed("z") or key_pressed("space") then
+    swing = 12
+    play_sound("swing")
+  end
+end
+
+-- Moves up to `dx` and `dy` pixels, one at a time, stopping at the first solid tile.
+warp function step(dx, dy)
+  repeat abs(dx) do
+    if blocked(x + sign(dx), y) then
+      return
+    end
+    x += sign(dx)
+  end
+  repeat abs(dy) do
+    if blocked(x, y + sign(dy)) then
+      return
+    end
+    y += sign(dy)
+  end
+end
+
+-- True when Pip's box (6 by 6 pixels) at (px, py) would overlap a solid tile.
+function blocked(px, py)
+  return solid(px - 3, py - 3) or solid(px + 2, py - 3) or solid(px - 3, py + 2) or solid(px + 2, py + 2)
+end
+
+-- Trees, rocks and water (tiles 3 to 5) are solid.
+function solid(px, py)
+  local t = tile_at(px, py)
+  return t >= 3 and t <= 5
+end
+
+function on_stage(px, py)
+  return px >= 0 and py >= 0 and px < stage_width() and py < stage_height()
+end
+
+-- Walking off the edge of the stage slides to the next room.
+function check_edges()
+  if x > stage_width() - 4 then
+    slide(1, 0)
+  elseif x < 4 then
+    slide(-1, 0)
+  elseif y > stage_height() - 4 then
+    slide(0, 1)
+  elseif y < 4 then
+    slide(0, -1)
+  end
+end
+
+-- Scrolls the map one room over, 4 pixels a tick, carrying Pip along so Pip stays on the same
+-- spot of the map, plus a few steps forward to clear the doorway.
+function slide(dx, dy)
+  state = "slide"
+  swing = 0
+  broadcast_wait("leave room")
+  local steps = stage_width() / 4
+  if dy ~= 0 then
+    steps = stage_height() / 4
+  end
+  local ahead = 12 / steps
+  repeat steps do
+    scroll_map(map_x() + dx * 4, map_y() + dy * 4)
+    x += dx * (ahead - 4)
+    y += dy * (ahead - 4)
+    animate()
+  end
+  broadcast_wait("enter room")
+  state = "play"
+end
+
+-- After a hit, Pip blinks and can't be hurt for a second.
+function flash()
+  if safe > 0 then
+    safe -= 1
+    if safe % 8 < 4 and safe > 0 then
+      set_effect("ghost", 70)
+    else
+      set_effect("ghost", 0)
+    end
+  end
+end
+
+function check_thimble()
+  if touching("Thimble") then
+    state = "busy"
+    hide()
+    broadcast("won")
+  end
+end
+
+-- A Lint bumped into Pip: lose a heart and get knocked away from it, unless still flashing.
+function hurt()
+  if safe == 0 then
+    hearts -= 1
+    safe = 60
+    knock = 6
+    knock_x = 0
+    knock_y = 0
+    if abs(x - hit_x) > abs(y - hit_y) then
+      knock_x = sign(x - hit_x)
+    else
+      knock_y = sign(y - hit_y)
+    end
+    broadcast("hud")
+    if hearts <= 0 then
+      state = "busy"
+      hide()
+      broadcast("died")
+    else
+      play_sound("hurt")
+    end
+  end
+end
+
+on message "heal" do
+  hearts = min(hearts + 1, max_hearts)
+  play_sound("heal")
+  broadcast("hud")
+end

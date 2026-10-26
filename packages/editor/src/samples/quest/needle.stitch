@@ -1,0 +1,16 @@
+-- The Needle: Pip's sword. Shown in front of Pip while `swing` counts down, pointing the way
+-- Pip faces. Lint that touch it get poked.
+on start do
+  hide()
+  rotation_style("all around")
+  forever do
+    if swing > 0 and state == "play" then
+      point(facing)
+      -- Seven pixels out from Pip's middle, the way Pip faces.
+      goto(x_of("Hero") + 7 * sin(facing), y_of("Hero") - 7 * cos(facing))
+      show()
+    else
+      hide()
+    end
+  end
+end

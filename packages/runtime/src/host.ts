@@ -20,6 +20,7 @@ export async function startHost(container: HTMLElement = document.body): Promise
     onReset: () => net.reset(),
     onLog: (sprite, text) => post({ t: 'log', sprite, text }),
     onError: (e) => post({ t: 'error', ...e }),
+    onShortcut: (action) => post({ t: 'shortcut', action }),
   });
 
   setInterval(

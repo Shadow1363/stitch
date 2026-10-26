@@ -1,0 +1,27 @@
+-- Hearts left behind by Lint. Walk over one to get a heart back.
+on start do
+  hide()
+end
+
+on message "drop heart" do
+  if not is_clone() then
+    goto(drop_x, drop_y)
+    create_clone()
+  end
+end
+
+on clone do
+  show()
+  forever do
+    if state == "play" and touching("Hero") then
+      broadcast("heal")
+      delete_clone()
+    end
+  end
+end
+
+on message "leave room" do
+  if is_clone() then
+    delete_clone()
+  end
+end

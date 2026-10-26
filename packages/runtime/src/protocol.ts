@@ -2,11 +2,12 @@ import type { SpriteInit, StageSettings } from '@stitch/cart';
 import type { ExtensionSource } from './core/extensions';
 import type { HttpRequest, HttpResponse } from './core/net';
 import type { MapInit } from './core/world';
+import type { StageShortcut } from './shortcuts';
 import type { CostumeImage } from './pixi/textures';
 import type { RendererPreference } from './pixi/stage';
 
 /** Bump on any message shape change; both sides check it in load/ready. */
-export const PROTOCOL_VERSION = 5;
+export const PROTOCOL_VERSION = 6;
 
 export interface LoadPayload {
   /** Compiled program: body of `new Function('rt', code)`. */
@@ -62,6 +63,8 @@ export type FromStage =
       /** 1-based line in `code` */ line?: number;
     }
   | { t: 'log'; sprite: string; text: string }
+  /** Run, Pause or Stop pressed while the stage has the keyboard. */
+  | { t: 'shortcut'; action: StageShortcut }
   /** A script's HTTP request; the editor fetches it (adding secrets) and answers `http-result`. */
   | ({ t: 'http'; id: number } & HttpRequest)
   | {
@@ -76,7 +79,14 @@ export type FromStage =
       audio: string;
     };
 
-export type { CostumeImage, ExtensionSource, HttpRequest, HttpResponse, RendererPreference };
+export type {
+  CostumeImage,
+  ExtensionSource,
+  HttpRequest,
+  HttpResponse,
+  RendererPreference,
+  StageShortcut,
+};
 
 export function transferablesOf(msg: ToStage): Transferable[] {
   if (msg.t !== 'load') return [];

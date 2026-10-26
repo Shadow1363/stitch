@@ -27,7 +27,7 @@ pnpm install
 pnpm dev
 ```
 
-Open `http://localhost:5173`. The editor starts with a sample game: press **Run** and use the arrow keys. **Cart → Samples** has bigger ones, with comments throughout for reading: **Stitch Dungeon**, a roguelike with procedurally generated floors, enemies as clones and a pen-drawn HUD and minimap; **Patch Hop**, a three-level platformer with tile collisions and stomping; and **Needle Storm**, a bullet hell against a three-phase boss. **Scratch Parity** checks Scratch 3 blocks one by one and prints PASS or FAIL for each. Then follow a tutorial:
+Open `http://localhost:5173`. The editor starts with a sample game: press **Run** and use the arrow keys. **Cart → Samples** has bigger ones, with comments throughout for reading: **Stitch Dungeon**, a roguelike with procedurally generated floors, enemies as clones and a pen-drawn HUD and minimap; **Patch Hop**, a three-level platformer with tile collisions and stomping; **Needle Storm**, a bullet hell against a three-phase boss; and **Thimble Quest**, a top-down adventure whose map scrolls room to room. Run, Pause and Stop are also ⌘↩, ⌘P and ⌘. (Ctrl on Windows and Linux), even while the game has the keyboard. **Scratch Parity** checks Scratch 3 blocks one by one and prints PASS or FAIL for each. Then follow a tutorial:
 
 - [Your first game, for Scratch users](docs/tutorials/first-game-scratch.md): blocks first.
 - [Your first game, for PICO-8 users](docs/tutorials/first-game-pico8.md): text first, with a tile map.

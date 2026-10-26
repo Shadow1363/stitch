@@ -26,7 +26,7 @@ export function createBuiltins(w: World) {
   const cellIndex = (x: Value, y: Value): number | undefined => {
     const m = w.map;
     if (!m) return undefined;
-    const p = space.toStagePx($.n(x), $.n(y));
+    const p = space.toMapPx($.n(x), $.n(y), m.scroll);
     const cx = Math.floor(p.x / m.tileSize);
     const cy = Math.floor(p.y / m.tileSize);
     if (cx < 0 || cy < 0 || cx >= m.width || cy >= m.height) return undefined;
@@ -533,6 +533,14 @@ export function createBuiltins(w: World) {
     map_width: (): number => w.map?.width ?? 0,
     map_height: (): number => w.map?.height ?? 0,
     tile_size: (): number => w.map?.tileSize ?? 0,
+    // map camera
+    scroll_map(x: Value, y: Value) {
+      const m = w.map;
+      if (!m) return;
+      m.scroll = { x: $.n(x), y: $.n(y) };
+    },
+    map_x: (): number => w.map?.scroll.x ?? 0,
+    map_y: (): number => w.map?.scroll.y ?? 0,
     // math
     random_int(a: Value, c: Value): number {
       const lo = Math.ceil(Math.min($.n(a), $.n(c)));

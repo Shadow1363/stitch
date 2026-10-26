@@ -49,10 +49,32 @@ describe('tile map builtins', () => {
     expect(init.cells[0]).toBe(1);
   });
 
+  it('scroll_map moves the map under the stage, so tile_at reads the scrolled cells', () => {
+    const w = world(normalizeStage({ width: 20, height: 10, origin: 'top-left', yAxis: 'down' }));
+    const b = createBuiltins(w);
+    expect([b.map_x(), b.map_y()]).toEqual([0, 0]);
+    b.scroll_map(20, 10);
+    expect([b.map_x(), b.map_y()]).toEqual([20, 10]);
+    // Stage (0, 0) now shows map pixel (20, 10): column 2, row 1, which is empty; (15, 5) is row 1 col 3.
+    expect(b.tile_at(0, 0)).toBe(0);
+    expect(b.tile_at(15, 15)).toBe(4);
+    b.set_tile(0, 0, 5);
+    expect(w.map!.cells[6]).toBe(5);
+  });
+
+  it('scrolls in map pixels whatever the stage origin and y axis', () => {
+    const b = createBuiltins(world());
+    b.scroll_map(10, 10);
+    // Cart (-20, 15) is the stage's top-left, now map pixel (10, 10): the 3.
+    expect(b.tile_at(-20, 15)).toBe(3);
+  });
+
   it('reports 0 everywhere without a map', () => {
     const w = new World({ stage: normalizeStage({}), sprites: [], costumes: {} });
     const b = createBuiltins(w);
     b.set_tile(0, 0, 1);
+    b.scroll_map(5, 5);
     expect(b.tile_at(0, 0)).toBe(0);
+    expect(b.map_x()).toBe(0);
   });
 });

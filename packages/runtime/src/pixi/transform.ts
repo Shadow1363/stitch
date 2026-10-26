@@ -14,6 +14,17 @@ export interface DisplayTransform {
   anchorY: number;
 }
 
+/** Where the map layer sits for a scroll: moved the other way, whole pixels for pixel art. */
+export function mapOffset(
+  scroll: { x: number; y: number },
+  pixelSnap: boolean,
+): { x: number; y: number } {
+  const x = -scroll.x;
+  const y = -scroll.y;
+  // `+ 0` turns -0 into 0.
+  return pixelSnap ? { x: Math.round(x) + 0, y: Math.round(y) + 0 } : { x, y };
+}
+
 export function displayTransform(
   sprite: Posed & { x: number; y: number; size: number },
   costume: CostumeInfo,

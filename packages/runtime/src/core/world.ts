@@ -64,6 +64,8 @@ export interface MapInit {
 /** Live tile map. `dirty` lists cells changed since the renderer last drew them. */
 export interface MapState extends MapInit {
   dirty: Set<number>;
+  /** The map pixel shown at the stage's top-left (`scroll_map`); 0, 0 at each Run. */
+  scroll: { x: number; y: number };
 }
 
 /** Signature of compiled programs: `new Function('rt', code)`. */
@@ -208,7 +210,7 @@ export class World implements RenderView {
     this.pen = new Pen(this.space);
     this.cloneLimit = opts.stage.cloneLimit;
     this.map = opts.map
-      ? { ...opts.map, cells: opts.map.cells.slice(), dirty: new Set() }
+      ? { ...opts.map, cells: opts.map.cells.slice(), dirty: new Set(), scroll: { x: 0, y: 0 } }
       : undefined;
   }
 

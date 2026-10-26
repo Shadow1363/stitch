@@ -1,0 +1,23 @@
+-- The Golden Thimble. It waits at the "$" in the world and shows only while its room does.
+on start do
+  hide()
+  forever do
+    if frame_count() % 20 == 0 then
+      next_costume()
+    end
+  end
+end
+
+-- Its place on the stage is its place in the map minus the scroll.
+on message "enter room" do
+  goto(thimble_x - map_x(), thimble_y - map_y())
+  if x >= 0 and x < stage_width() and y >= 0 and y < stage_height() then
+    show()
+  else
+    hide()
+  end
+end
+
+on message "leave room" do
+  hide()
+end

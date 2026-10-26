@@ -19,7 +19,7 @@ Short examples are statements; in a program they sit inside an event script or a
 
 A cart has one file for the **Stage** and one per sprite. Each file is a list of items: variable declarations, functions and event scripts. Statements only appear inside a script or function. The Stage file is the place for global variables and scripts that belong to no sprite.
 
-Text and blocks are two views of the same program. Editing either one updates the other. A block edit rewrites the text in one canonical layout (two-space indents, one statement per line), the way `gofmt` does for Go. **Format** (⇧⌥F, and on save unless it's turned off under ⚙) does the same for text you type, and also puts a blank line around each script and function. Comments start with `--` and run to the end of the line; they're kept where they are, and appear as block comments.
+Text and blocks are two views of the same program. Editing either one updates the other. A block edit rewrites the text in one canonical layout (two-space indents, one statement per line), the way `gofmt` does for Go. **Run**, **Pause** and **Stop** are ⌘↩, ⌘P and ⌘. (Ctrl on Windows and Linux), even while the game has the keyboard. **Format** (⇧⌥F, and on save unless it's turned off under ⚙) does the same for text you type, and also puts a blank line around each script and function. Comments start with `--` and run to the end of the line; they're kept where they are, and appear as block comments.
 
 While you type, the code view suggests what fits where the cursor is: statements and commands at the start of a line, reporters and variables in an expression, and inside a string the cart's own sprite, costume, sound, song and message names. Every suggestion and hover shows the entry from this reference, with its block. **F12** (or ⌘-click) goes to where a variable or function is declared.
 
@@ -401,6 +401,8 @@ Values every program can read without declaring them. Sprite properties are writ
 | [`map_width()`](#map_width--reporter) | number | the whole program | read-only | The map's width in cells (0 without a map). |
 | [`map_height()`](#map_height--reporter) | number | the whole program | read-only | The map's height in cells. |
 | [`tile_size()`](#tile_size--reporter) | number | the whole program | read-only | The map's tile size in stage pixels. |
+| [`map_x()`](#map_x--reporter) | number | the whole program | read-only | How far the map is scrolled to the right, in map pixels. |
+| [`map_y()`](#map_y--reporter) | number | the whole program | read-only | How far the map is scrolled down, in map pixels. |
 | [`answer()`](#answer--reporter) | string | the whole program | read-only | The last answer typed for `ask`: one for the whole program, empty until the first answer and after each **Run**. |
 | [`stage_width()`](#stage_width--reporter) | number | the whole program | read-only | The stage's width in stage pixels, from **Cart → Stage** (480 by default). |
 | [`stage_height()`](#stage_height--reporter) | number | the whole program | read-only | The stage's height in stage pixels (360 by default). |
@@ -2342,6 +2344,45 @@ goto(col * tile_size(), row * tile_size())
 ```
 
 </td><td><img src="blocks/tile_size.svg" alt="go to x col * tile size y row * tile size"></td></tr></table>
+
+### `scroll_map(x, y)` — command
+
+Scrolls the map so the map pixel at x, y (from its top-left, y down) shows at the stage's top-left. Only the map moves: sprites, the pen and the mouse stay in stage coordinates, so draw a sprite at its world position minus `map_x()` and `map_y()`. `tile_at` and `set_tile` read the map under a stage point, scrolled. Each Run starts at 0, 0.
+
+<table><tr><td>
+
+<!-- example: scroll_map -->
+```stitch
+scroll_map(map_x() + 1, 0)
+```
+
+</td><td><img src="blocks/scroll_map.svg" alt="scroll map to x (map x + 1) y 0"></td></tr></table>
+
+### `map_x()` — reporter
+
+How far the map is scrolled to the right, in map pixels.
+
+<table><tr><td>
+
+<!-- example: map_x -->
+```stitch
+goto(world_x - map_x(), world_y - map_y())
+```
+
+</td><td><img src="blocks/map_x.svg" alt="go to x (world_x - map x) y (world_y - map y)"></td></tr></table>
+
+### `map_y()` — reporter
+
+How far the map is scrolled down, in map pixels.
+
+<table><tr><td>
+
+<!-- example: map_y -->
+```stitch
+print(map_y())
+```
+
+</td><td><img src="blocks/map_y.svg" alt="print map y"></td></tr></table>
 
 <!-- /generated -->
 

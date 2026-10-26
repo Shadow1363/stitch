@@ -13,6 +13,7 @@
     "./fetch-net": "./src/web/fetch-net.ts",
     "./mic": "./src/web/mic.ts",
     "./runner": "./src/runner.ts",
+    "./shortcuts": "./src/shortcuts.ts",
     "./extensions": "./src/core/extensions.ts"
   },
   "dependencies": {

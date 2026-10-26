@@ -1,0 +1,231 @@
+-- Thimble Quest: a little top-down adventure. Pip has lost the Golden Thimble somewhere in the
+-- overworld. Walk from screen to screen, poke the Lint with your Needle, and find it.
+-- The world is nine rooms, three by three. The map is bigger than the stage, and walking off
+-- the edge of a room slides the map to the next one with `scroll_map`, as old adventure games do.
+-- The Stage builds the map from text, keeps the game's state and draws the hearts.
+-- "busy" while setting up, "play" while you can move, "slide" between rooms, "over" with no
+-- hearts left, "won" once the thimble is found.
+global var state = "busy"
+global var hearts = 3
+global var max_hearts = 3
+-- Where Pip starts, and where Lint and the thimble are, in map pixels (from the map's top-left).
+global var start_x = 0
+global var start_y = 0
+global var thimble_x = 0
+global var thimble_y = 0
+-- A dictionary with x and y for each "e" in the world.
+global var lint_spots = []
+-- Set by a Lint that bumps into Pip, with where it was, so Pip knows which way to be knocked
+-- back. A flag rather than a message: a message sent every tick restarts its script each time,
+-- before it gets to run.
+global var bumped = false
+global var hit_x = 0
+global var hit_y = 0
+-- Pip's facing as a direction (0 up, 90 right, 180 down, -90 left) and how long the Needle is out.
+global var facing = 180
+global var swing = 0
+-- Where a defeated Lint dropped a heart, in stage pixels.
+global var drop_x = 0
+global var drop_y = 0
+
+-- The world is at the end of this file: 72 by 48 cells of 8 pixels, a row of text per row.
+-- Each room is 24 by 16 cells (the stage's size). T a tree, # a rock, ~ water, : a sandy path,
+-- , a tuft of grass, * flowers, P where Pip starts, e a Lint, $ the Golden Thimble.
+-- Trees, rocks and water are solid. Leave gaps in a room's edge to make ways through.
+on start do
+  build_map(world())
+  new_game()
+end
+
+on message "restart" do
+  new_game()
+end
+
+function new_game()
+  state = "busy"
+  hearts = max_hearts
+  swing = 0
+  bumped = false
+  facing = 180
+  reset_timer()
+  broadcast_wait("leave room")
+  -- Show the room Pip starts in: the room's top-left corner goes at the stage's top-left.
+  scroll_map(floor(start_x / stage_width()) * stage_width(), floor(start_y / stage_height()) * stage_height())
+  broadcast_wait("spawn")
+  broadcast_wait("enter room")
+  play_music("quest")
+  draw_hud()
+  state = "play"
+end
+
+-- Turns the world's text into map cells: tile 1 is grass, 2 sand, 3 a tree, 4 a rock, 5 water
+-- and 6 flowers. Letters for things (P, e, $) leave plain ground and note where they are.
+warp function build_map(rows)
+  lint_spots = []
+  for row = 1, map_height() do
+    local line = rows[row]
+    for col = 1, map_width() do
+      local c = substring(line, col, col)
+      local tile = 0
+      if c == "," then
+        tile = 1
+      elseif c == ":" then
+        tile = 2
+      elseif c == "T" then
+        tile = 3
+      elseif c == "#" then
+        tile = 4
+      elseif c == "~" then
+        tile = 5
+      elseif c == "*" then
+        tile = 6
+      elseif c == "P" then
+        start_x = col * 8 - 4
+        start_y = row * 8 - 4
+      elseif c == "$" then
+        thimble_x = col * 8 - 4
+        thimble_y = row * 8 - 4
+        tile = 6
+      elseif c == "e" then
+        push(lint_spots, spot(col, row))
+      end
+      set_map_cell(col, row, tile)
+    end
+  end
+end
+
+-- The centre of a cell in map pixels, as a dictionary with x and y.
+function spot(col, row)
+  local s = dict()
+  s["x"] = col * 8 - 4
+  s["y"] = row * 8 - 4
+  return s
+end
+
+-- ---- Messages from the sprites ----
+on message "hud" do
+  draw_hud()
+end
+
+on message "died" do
+  state = "over"
+  stop_music()
+  play_sound("lose")
+  draw_hud()
+  panel("GAME OVER", 9)
+  centered("PRESS R TO TRY AGAIN", 72, 1)
+end
+
+on message "won" do
+  state = "won"
+  stop_music()
+  play_sound("win")
+  panel("YOU FOUND IT!", 11)
+  centered("THE GOLDEN THIMBLE, IN " .. round(timer()) .. " SECONDS", 72, 1)
+  centered("PRESS R TO PLAY AGAIN", 82, 1)
+end
+
+on key "r" do
+  if state == "over" or state == "won" then
+    broadcast("restart")
+  end
+end
+
+-- ---- The hearts, drawn with the pen in the top-left corner ----
+-- The pen is in stage pixels, so it stays put while the map scrolls under it.
+warp function draw_hud()
+  clear_pen()
+  set_pen_size(1)
+  set_pen_color(1)
+  fill_rect(0, 0, max_hearts * 9 + 3, 9)
+  for i = 1, max_hearts do
+    if i <= hearts then
+      set_pen_color(9)
+    else
+      set_pen_color(6)
+    end
+    heart(i * 9 - 6, 2)
+  end
+end
+
+-- A heart 7 by 6 pixels with its top-left at (left, top), a rectangle per row or two.
+-- `fill_rect` goes from one corner to the other, so a row one pixel high spans top to top + 1.
+function heart(left, top)
+  fill_rect(left + 1, top, left + 3, top + 1)
+  fill_rect(left + 4, top, left + 6, top + 1)
+  fill_rect(left, top + 1, left + 7, top + 3)
+  fill_rect(left + 1, top + 3, left + 6, top + 4)
+  fill_rect(left + 2, top + 4, left + 5, top + 5)
+  fill_rect(left + 3, top + 5, left + 4, top + 6)
+end
+
+-- A box across the middle of the stage with a big title in colour c.
+function panel(title, c)
+  set_pen_color(1)
+  fill_rect(8, 40, 183, 92)
+  set_pen_color(c)
+  centered(title, 48, 2)
+  set_pen_color(8)
+end
+
+-- Writes text centred across the stage. The pixel font is 4 pixels a letter.
+function centered(text, top, scale)
+  set_pen_size(scale)
+  draw_text(text, stage_width() / 2 - len(text) * 2 * scale, top)
+end
+
+-- ---- The world ----
+-- Top row of rooms: the pond, the rocks and the thimble's glade. Middle: the flower meadow,
+-- the lakes and the woods. Bottom: the quiet corner, where Pip starts, and the marsh.
+function world()
+  local rows = []
+  push(rows, "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT")
+  push(rows, "T.............,........TT......,...............TT......................T")
+  push(rows, "T..~~~~~...............TT.,##...#.....,..###...TT..TTT.................T")
+  push(rows, "T..~~~~~..........*....TT..##...#..,.....###...TT..TTT...*.............T")
+  push(rows, "T..~~~~~.........e.....TT....e..#.......e......TT..............#####...T")
+  push(rows, "T...~~~................TT......................TT...,...,,.....#***#...T")
+  push(rows, "T.........::::::::::::::::::::::::::::::::::::::::::::::::::::..***#...T")
+  push(rows, "T.........::::::::::::::::::::::::::::::::::::::::::::::::::::..*$*#...T")
+  push(rows, "T.........::::::::::::::::::::::::::::::::::::::::::::::::::::..***#...T")
+  push(rows, "T......,.,::::::::::::::::::::::::::::::::::::::::::::::::::::.#***#.,.T")
+  push(rows, "T...,.e...::::.........TT.........::::.........TT...,..........#####...T")
+  push(rows, "T.T.......::::..~~~~~..TT.........::::...##....TT..,...........,.......T")
+  push(rows, "T..T..*...::::..~~~~~..TT..###.#..::::..e##.*..TT..TTT...*.............T")
+  push(rows, "T....,....::::..~~~~~..TT..###....::::...##....TT..TTT.................T")
+  push(rows, "T.........::::.........TT.........::::.........TT.......,..............T")
+  push(rows, "TTTTTTTTTT::::TTTTTTTTTTTTTTTTTTTT::::TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT")
+  push(rows, "TTTTTTTTTT::::TTTTTTTTTTTTTTTTTTTT::::TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT")
+  push(rows, "T.........::::.........TT.....,...::::.........TT......................T")
+  push(rows, "T....*....::::.........TT.~~~~~~..::::..~~~~~~.TT..T...T........T...T..T")
+  push(rows, "T..*..e...::::...*.....TT.~~~~~~..::::..~~~~~~.TT....T.......,....T....T")
+  push(rows, "T......*..::::.....*...TT.~~~~~~..::::..~~~~~~.TT.......,..............T")
+  push(rows, "T........,::::.........TT....,....::::.........TT..T.....,.......T..T..T")
+  push(rows, "T.........::::::::::::::::::e:::::::::::e:::::::::::::::::::::....,....T")
+  push(rows, "T..TTT....::::::::::::::::::::::::::::::::::::::::::::::::::::.........T")
+  push(rows, "T..TTT....::::::::::::::::::::::::::::::::::::::::::::::::::::....e..,.T")
+  push(rows, "T..,......::::::::::::::::::::::::::::::::::::::::::::::::::::.........T")
+  push(rows, "T.........::::.........TT.........::::..,......TT.........::::.........T")
+  push(rows, "T.....*.,.::::.....*..,TT.~~~~~~..::::..~~~~~~,TT.........::::...T.....T")
+  push(rows, "T...*..,..::::..*.e....TT.~~~~~~e.::::..~~~~~~.TT..T...e..::::.........T")
+  push(rows, "T.........::::......*..TT.~~~~~~..::::..~~~~~~,TT.....T...::::...e..T..T")
+  push(rows, "T....,....::::.........TT...,.....::::.........TT.........::::..,......T")
+  push(rows, "TTTTTTTTTT::::TTTTTTTTTTTTTTTTTTTT::::TTTTTTTTTTTTTTTTTTTT::::TTTTTTTTTT")
+  push(rows, "TTTTTTTTTT::::TTTTTTTTTTTTTTTTTTTT::::TTTTTTTTTTTTTTTTTTTT::::TTTTTTTTTT")
+  push(rows, "T.........::::..,......TT.........::::.........TT....,....::::...,.....T")
+  push(rows, "T.........::::.........TT.....TT..::::..TT.....TT.........::::.........T")
+  push(rows, "T.,###....::::..e,*....TT...*.TT..::::..TT.*...TT.........::::.~~~~~...T")
+  push(rows, "T..###....::::.........TT.........::::.......,.TT...*...e.::::.~~~~~..,T")
+  push(rows, "T.........::::.........TT.........::::.........TT.......,.::::.~~~~~...T")
+  push(rows, "T.........::::::::::::::::::::::::::::::::::::::::::::::::::::.........T")
+  push(rows, "T......,..::::::::::::::::::::::::::::::::::::::::::::::::::::.........T")
+  push(rows, "T.........::::::::::::::::::::::::::::::::::::::::::::::::::::.........T")
+  push(rows, "T.........::::::::::::::::::::::::::::::::::::::::::::::::::::.........T")
+  push(rows, "T.....................,TT....................,.TT..............,.......T")
+  push(rows, "T..T..e,.........~~~~..TT..TT.....,.P......TT..TT..####.........e.....,T")
+  push(rows, "T....*..T.....,..~~~~..TT..TT*............*TT..TT..####...........*....T")
+  push(rows, "T......................TT......................TT....,.................T")
+  push(rows, "T......................TT......................TT..............,.......T")
+  push(rows, "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT")
+  return rows
+end

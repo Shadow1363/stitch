@@ -43,6 +43,15 @@ describe('space', () => {
     }
   });
 
+  it('toMapPx is stage pixels plus the scroll, for every setting', () => {
+    for (const st of ALL) {
+      const s = createSpace(st);
+      const p = s.toStagePx(7, -3);
+      expect(s.toMapPx(7, -3, { x: 0, y: 0 })).toEqual(p);
+      expect(s.toMapPx(7, -3, { x: 100, y: 40 })).toEqual({ x: p.x + 100, y: p.y + 40 });
+    }
+  });
+
   it('direction 90 moves screen-right and 0 moves screen-up, whatever the y axis', () => {
     for (const st of ALL) {
       const s = createSpace(st);

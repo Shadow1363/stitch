@@ -1,0 +1,151 @@
+-- Lint: fluffy pests. The hidden original makes a clone for each "e" in the room Pip walks
+-- into, and the clones go when Pip leaves, so a room's Lint come back every visit.
+-- Each wanders, turning at walls. Two pokes of the Needle and it's gone, sometimes leaving a heart.
+-- Which way this Lint walks, and for how many more ticks.
+var dx = 0
+var dy = 0
+var walking = 0
+var hp = 2
+-- Ticks before it can be poked again, so one swing is one poke.
+var stunned = 0
+
+on start do
+  hide()
+end
+
+on message "enter room" do
+  if not is_clone() then
+    spawn_all()
+  end
+end
+
+-- One clone per spot inside the room being shown. Spots are in map pixels; the room's are the
+-- ones that land on the stage once the scroll is taken off.
+warp function spawn_all()
+  for s in lint_spots do
+    local sx = s["x"] - map_x()
+    local sy = s["y"] - map_y()
+    if sx >= 0 and sx < stage_width() and sy >= 0 and sy < stage_height() then
+      goto(sx, sy)
+      create_clone()
+    end
+  end
+end
+
+on clone do
+  hp = 2
+  walking = 0
+  show()
+  forever do
+    if state == "play" then
+      wander()
+      poked()
+      bump()
+    end
+  end
+end
+
+function wander()
+  if walking <= 0 then
+    turn_somewhere()
+  end
+  walking -= 1
+  -- Half a pixel a tick: a step every other tick.
+  if frame_count() % 2 == 0 then
+    if blocked(x + dx, y + dy) then
+      turn_somewhere()
+    else
+      x += dx
+      y += dy
+    end
+  end
+  if frame_count() % 12 == 0 then
+    next_costume()
+  end
+end
+
+-- Picks one of the four directions, and how long to keep going.
+function turn_somewhere()
+  local d = random_int(1, 4)
+  dx = 0
+  dy = 0
+  if d == 1 then
+    dx = 1
+  elseif d == 2 then
+    dx = -1
+  elseif d == 3 then
+    dy = 1
+  else
+    dy = -1
+  end
+  walking = random_int(30, 90)
+end
+
+function poked()
+  if stunned > 0 then
+    stunned -= 1
+    if stunned == 0 then
+      set_effect("brightness", 0)
+    end
+  elseif touching("Needle") then
+    hp -= 1
+    stunned = 15
+    play_sound("hit")
+    set_effect("brightness", 60)
+    knock_back()
+    if hp <= 0 then
+      vanish()
+    end
+  end
+end
+
+-- Pushed 8 pixels the way Pip is facing, stopping at walls.
+warp function knock_back()
+  local kx = round(sin(facing))
+  local ky = -round(cos(facing))
+  repeat 8 do
+    if blocked(x + kx, y + ky) then
+      return
+    end
+    x += kx
+    y += ky
+  end
+end
+
+function vanish()
+  play_sound("poof")
+  if random_int(1, 3) == 1 then
+    drop_x = x
+    drop_y = y
+    broadcast("drop heart")
+  end
+  delete_clone()
+end
+
+-- Touching Pip hurts Pip. Pip decides whether it counts (not while flashing).
+function bump()
+  if touching("Hero") then
+    hit_x = x
+    hit_y = y
+    bumped = true
+  end
+end
+
+-- Lint keep to their room: the stage's edges count as walls, as do trees, rocks and water.
+function blocked(px, py)
+  return solid(px - 3, py - 3) or solid(px + 2, py - 3) or solid(px - 3, py + 2) or solid(px + 2, py + 2)
+end
+
+function solid(px, py)
+  if px < 0 or py < 0 or px >= stage_width() or py >= stage_height() then
+    return true
+  end
+  local t = tile_at(px, py)
+  return t >= 3 and t <= 5
+end
+
+on message "leave room" do
+  if is_clone() then
+    delete_clone()
+  end
+end

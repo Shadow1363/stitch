@@ -16,7 +16,7 @@ import { ADVANCE, glyph, LINE_HEIGHT, type PenOp } from '../core/pen';
 import { LETTERBOX, type Renderer, type RenderView } from '../core/renderer';
 import type { CostumeInfo, Effects, Sprite } from '../core/sprite';
 import type { MapState } from '../core/world';
-import { displayTransform } from './transform';
+import { displayTransform, mapOffset } from './transform';
 
 /** Adds one line or shape to the batch. */
 function drawOp(g: Graphics, op: Exclude<PenOp, { kind: 'clear' | 'stamp' }>) {
@@ -81,6 +81,9 @@ interface Bubble {
 const SMOOTH_PEN_RESOLUTION = Math.min(4, Math.ceil((globalThis.devicePixelRatio || 1) * 2));
 
 /** Draws a World with PixiJS v8. Rendering is driven by the caller (no Pixi ticker). */
+/** Bigger maps (in stage pixels) draw tile by tile; 4096 is within every WebGL's texture limit. */
+const MAX_MAP_TEXTURE = 4096;
+
 export class PixiRenderer implements Renderer {
   readonly app = new Application();
   private world = new Container();
@@ -89,10 +92,18 @@ export class PixiRenderer implements Renderer {
   private clip = new Graphics();
   /** Map and sprites, clipped to the stage together. */
   private content = new Container();
+  /** One sprite per tile, drawn 1:1 into `mapTexture` whenever cells change. */
   private mapLayer = new Container();
   private mapSprites: (PixiSprite | undefined)[] = [];
   private tileTextures: Texture[] = [];
   private mapFor: MapState | undefined;
+  /**
+   * The map as one picture, scaled with the stage. Scaling tiles one by one lets a tile's edge
+   * sample its neighbour in the tileset at some zooms (a seam); scaling one texture can't.
+   * Maps too big for a texture keep drawing `mapLayer` directly.
+   */
+  private mapTexture: RenderTexture | undefined;
+  private mapSprite = new PixiSprite();
   /** Pen drawing: a texture between the map and the sprites (Scratch's pen layer). */
   private penTexture: RenderTexture | undefined;
   private penSprite = new PixiSprite();
@@ -130,7 +141,7 @@ export class PixiRenderer implements Renderer {
     opts.container.appendChild(r.app.canvas);
     r.app.stage.addChild(r.world);
     r.world.addChild(r.backdrop, r.clip, r.content, r.bubbles, r.watchLayer);
-    r.content.addChild(r.backdropSprite, r.mapLayer, r.penSprite, r.layer);
+    r.content.addChild(r.backdropSprite, r.mapSprite, r.penSprite, r.layer);
     r.layer.sortableChildren = true;
     r.content.mask = r.clip;
     return r;
@@ -163,6 +174,10 @@ export class PixiRenderer implements Renderer {
 
     this.syncBackdrop(view);
     this.syncMap(view.map);
+    if (view.map) {
+      const o = mapOffset(view.map.scroll, st.scaling.filter === 'pixel');
+      (this.mapTexture ? this.mapSprite : this.mapLayer).position.set(o.x, o.y);
+    }
     this.syncPen(
       view,
       `${st.width}x${st.height}:${st.scaling.filter}`,
@@ -444,11 +459,34 @@ export class PixiRenderer implements Renderer {
       }
       for (let i = 0; i < map.cells.length; i++) this.placeTile(map, i);
       map.dirty.clear();
+      const w = map.width * map.tileSize;
+      const h = map.height * map.tileSize;
+      if (w > 0 && h > 0 && w <= MAX_MAP_TEXTURE && h <= MAX_MAP_TEXTURE) {
+        this.mapTexture = RenderTexture.create({
+          width: w,
+          height: h,
+          resolution: 1,
+          scaleMode: tex?.source.scaleMode ?? 'nearest',
+        });
+        this.mapSprite.texture = this.mapTexture;
+        this.mapSprite.visible = true;
+        this.bakeMap();
+      } else {
+        this.content.addChildAt(this.mapLayer, this.content.getChildIndex(this.mapSprite));
+      }
       return;
     }
     if (!map || !map.dirty.size) return;
     for (const i of map.dirty) this.placeTile(map, i);
     map.dirty.clear();
+    this.bakeMap();
+  }
+
+  /** Draws the tiles into the map texture, at whole stage pixels. */
+  private bakeMap() {
+    if (!this.mapTexture) return;
+    this.mapLayer.position.set(0, 0);
+    this.app.renderer.render({ container: this.mapLayer, target: this.mapTexture, clear: true });
   }
 
   private placeTile(map: MapState, i: number) {
@@ -472,6 +510,10 @@ export class PixiRenderer implements Renderer {
 
   private clearMap() {
     this.mapLayer.removeChildren().forEach((c) => c.destroy());
+    this.mapLayer.removeFromParent();
+    this.mapSprite.visible = false;
+    this.mapTexture?.destroy(true);
+    this.mapTexture = undefined;
     this.mapSprites = [];
     for (const t of this.tileTextures) t.destroy(false);
     this.tileTextures = [];

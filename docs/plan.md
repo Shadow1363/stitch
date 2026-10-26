@@ -22,6 +22,7 @@ Architecture rules, stack and conventions are in [`CLAUDE.md`](../CLAUDE.md). De
 | 14    | The rest of Scratch 3      | ✅ Done (awaiting review) |
 | 15    | Importing Scratch projects (.sb3) | ✅ Done (awaiting review) |
 | 16    | Vector point editing, docs diagrams | ✅ Done (awaiting review) |
+| 17    | Run/Pause/Stop keys, map camera, Thimble Quest | ✅ Done (awaiting review) |
 
 **Performance targets:** 1,000 moving sprites at 60 fps on a mid-range laptop. Editor first load under 2 s on broadband. Runtime-only export bundle under 500 KB gzipped (172 KB at Phase 6, enforced in CI).
 
@@ -478,7 +479,7 @@ Differences from Stitch Dungeon's approach:
 
 Known gaps:
 
-- The platformer's levels are single screens: the map is anchored to the stage, so there's no scrolling camera.
+- The platformer's levels are single screens. Since Phase 17 the map can scroll (`scroll_map`), but Patch Hop doesn't use it.
 - Needle Storm's bot doesn't dodge (the test gives it extra lives), so fairness is judged by pattern density rather than proven by play. A non-dodging bot took 27 hits over a 105 s fight with the original 900 HP. HP is now 600.
 
 ## Phase 13 — Editor chrome: docs, icons, pause, full screen ✅
@@ -598,6 +599,36 @@ Known gaps:
 - The vector editor has no text tool, so imported text can be moved and restyled but not retyped.
 - Reshape has no box selection; Shift-click picks several points.
 
+## Phase 17 — Run/Pause/Stop keys, map camera, Thimble Quest ✅
+
+- **Keyboard shortcuts:** ⌘↩ Run, ⌘P Pause/Resume, ⌘. Stop (Ctrl elsewhere).
+  - `stageShortcut` (`runtime/src/shortcuts.ts`) is the one mapping, by key code, used by both sides.
+  - The editor handles the keys in its window capture listener, so they work in CodeMirror (where ⌘↩ would add a line), text fields and the art editors.
+  - Inside the stage, `StageRunner`'s `onShortcut` catches them before the game sees them, even while paused, and the stage posts a new `shortcut` message (`PROTOCOL_VERSION` 6). Players pass no `onShortcut`, so the keys do nothing there.
+  - Nothing happens while a dialog is open. The buttons' tooltips and `aria-keyshortcuts` list the keys.
+- **Map camera:** `scroll_map(x, y)`, `map_x()` and `map_y()`.
+  - **What scrolls:** only the map. Sprites, the pen and the mouse stay in stage coordinates, as in Scratch games that scroll with a variable.
+  - **Tile reads:** `tile_at`, `set_tile` and colour sensing read the map under a stage point, scrolled, so collision code doesn't change. `map_cell` stays in map cells.
+  - **Storage:** the scroll lives on `MapState.scroll`, so it resets each Run and isn't cart data.
+  - **Code paths:** `Space.toMapPx` does the maths, and the renderer moves the map layer by `mapOffset` (`pixi/transform.ts`), in whole pixels for pixel-art carts.
+- **Thimble Quest** (`?sample=quest`): a top-down adventure on a 192×128 stage.
+  - **World:** nine rooms in a 72×48 map, written as text in the Stage file.
+  - **Camera:** walking off a room's edge slides the map to the next room, 4 pixels a tick.
+  - **Combat:** Pip pokes Lint (clones that respawn on each visit) with the Needle. Hearts are drawn with the pen and drop from Lint. The Golden Thimble is in the far glade.
+  - **Source:** built from `src/samples/quest/*.stitch` and `build.ts`, like Patch Hop.
+  - **Tests:** `quest.test.ts` checks that the code is canonical, the slide and `tile_at` after it, losing every heart and restarting, two pokes removing a Lint, and a bot winning from five seeds. It also won from 40 seeds while being tuned.
+
+Found while building it:
+
+- Tile maps could show a one-pixel seam at some zooms, where a tile's edge sampled its neighbour in the tileset. It showed down the middle of Thimble Quest's paths even unscrolled. The renderer now draws the tiles 1:1 into one texture whenever cells change and scales that, so seams can't happen. Maps over 4096 pixels on a side still draw tile by tile.
+
+- A message broadcast every tick never runs its receiver if the receiver's thread comes later in the tick order. Each broadcast restarts the receiver as pending (D6) before its turn, and it never reaches a step. Scratch runs the restarted script in the same frame, so imported "broadcast every frame" loops could stall. Thimble Quest uses a flag instead. Owner decision below.
+
+Known gaps:
+
+- A map over 4096 stage pixels on a side falls back to one Pixi sprite per tile, with no culling and with the old seams.
+- The map editor shows the whole map unscrolled. Before Run, the stage shows the map's top-left room.
+
 ## Open decisions (owner)
 
 1. Approve the Scratch departures D1–D36 in `departures.md` (D36, merging each sprite's sounds into the cart's bank on import, is new in Phase 15; D33–D35, the clock sampled per tick, the editor-proxied microphone and drag mode everywhere, are new in Phase 14; D32, `ask`'s answer field and `frame_count`, in Phase 11). D24–D31 are new in Phase 9: pen shapes and layer, the clone-limit error, `shared var`, CPU-only colour sensing, fixed `delta_time`, `watch` monitors, `break`/`continue`/dictionaries and the pixel font. D21 changed: JSON objects now become dictionaries.
@@ -608,6 +639,7 @@ Known gaps:
 4. Default renderer: WebGL (current) or WebGPU. Both hold 60 fps at 1,000 sprites on the M2.
 5. Dev CORS rule: allowing the `null` origin means any site's sandboxed iframe can load dev modules while the dev server runs. Builds no longer need it (the stage script is inlined). Dev could do the same with `buildIife`, at the cost of stage hot reload.
 6. Install Rust here (or in CI) so the Tauri template and the desktop editor can be built and tested.
+7. Broadcast starvation (Phase 17): should a broadcast that restarts a thread later in this tick's order let it run this tick, as Scratch does, or keep D6 strictly and document the starvation?
 
 ## Known gaps
 

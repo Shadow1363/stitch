@@ -2,6 +2,7 @@ import { bulletCart } from '../samples/bullet/build';
 import { examplesCart } from '../samples/examples/build';
 import { parityCart } from '../samples/parity/build';
 import { platformerCart } from '../samples/platformer/build';
+import { questCart } from '../samples/quest/build';
 import { cartFromUrl } from './files';
 import { loadSample } from './project';
 import { Session, STAGE_FILE } from './session';
@@ -20,9 +21,9 @@ export interface Sample {
 
 /**
  * The samples in the Cart tab and `?sample=<id>`. Bounce is built from source and is the first
- * cart a new user sees; Examples is generated from the docs registry; Patch Hop, Needle Storm
- * and Scratch Parity are built from their `.stitch` code and the art and sound in their
- * `build.ts`; Stitch Dungeon is a cart made in the editor and saved as `.stitch.png`.
+ * cart a new user sees; Examples is generated from the docs registry; Patch Hop, Needle Storm,
+ * Thimble Quest and Scratch Parity are built from their `.stitch` code and the art and sound in
+ * their `build.ts`; Stitch Dungeon is a cart made in the editor and saved as `.stitch.png`.
  */
 export const SAMPLES: readonly Sample[] = [
   {
@@ -48,6 +49,12 @@ export const SAMPLES: readonly Sample[] = [
     title: 'Needle Storm',
     about: 'A bullet hell: one boss, three phases of patterns',
     build: () => fromBuilt(bulletCart()),
+  },
+  {
+    id: 'quest',
+    title: 'Thimble Quest',
+    about: 'A top-down adventure: nine rooms on a scrolling map, a needle-sword, Lint to poke',
+    build: () => fromBuilt(questCart()),
   },
   {
     id: 'parity',

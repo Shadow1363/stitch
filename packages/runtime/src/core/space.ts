@@ -13,6 +13,8 @@ export interface Space {
   readonly height: number;
   toStagePx(x: number, y: number): { x: number; y: number };
   fromStagePx(px: number, py: number): { x: number; y: number };
+  /** Map pixel (x right, y down from the map's top-left) under a cart point, with the map scrolled. */
+  toMapPx(x: number, y: number, scroll: { x: number; y: number }): { x: number; y: number };
   /** Cart-space delta for moving `dist` steps in visual direction `dir`. */
   forward(dir: number, dist: number): { dx: number; dy: number };
   /** Cart-space delta for a stage-pixel delta. */
@@ -38,6 +40,7 @@ export function createSpace(settings: StageSettings): Space {
     height: h,
     toStagePx: (x, y) => ({ x: ox + x, y: up ? oy - y : oy + y }),
     fromStagePx: (px, py) => ({ x: px - ox, y: up ? oy - py : py - oy }),
+    toMapPx: (x, y, scroll) => ({ x: ox + x + scroll.x, y: (up ? oy - y : oy + y) + scroll.y }),
     forward(dir, dist) {
       const sx = dist * Math.sin(dir * RAD);
       const sy = -dist * Math.cos(dir * RAD);

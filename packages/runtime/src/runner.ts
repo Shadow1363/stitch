@@ -10,6 +10,7 @@ import { World, type Program } from './core/world';
 import { PixiRenderer, type RendererPreference } from './pixi/stage';
 import { texturesFromCostumes } from './pixi/textures';
 import type { LoadPayload } from './protocol';
+import { stageShortcut, type StageShortcut } from './shortcuts';
 import { FrameStats } from './stats';
 import { DomAsk, fromAskField, type StageRect } from './web/ask';
 import { WebAudioOut } from './web/audio';
@@ -32,6 +33,8 @@ export interface StageRunnerOptions {
   onError: (e: RunnerError) => void;
   /** Called before each fresh world, e.g. to forget a previous run's pending requests. */
   onReset?: () => void;
+  /** Run, Pause and Stop chords pressed in the stage; they never reach the game. */
+  onShortcut?: (action: StageShortcut) => void;
 }
 
 export class StageRunner {
@@ -223,6 +226,12 @@ export class StageRunner {
     addEventListener('pointerdown', () => this.audio.unlock(), true);
     addEventListener('keydown', (e) => {
       this.audio.unlock();
+      const shortcut = this.opts.onShortcut && stageShortcut(e);
+      if (shortcut) {
+        e.preventDefault();
+        this.opts.onShortcut!(shortcut);
+        return;
+      }
       // Typing an answer to `ask` isn't playing the game (D32).
       if (fromAskField(e.target) || this.paused) return;
       if (PREVENT.has(e.key)) e.preventDefault();

@@ -8,6 +8,7 @@
   import type { AssistData } from './lib/assist';
   import type { FromStage } from '@stitch/runtime/protocol';
   import { Microphone, streamLevel, usesLoudness } from '@stitch/runtime/mic';
+  import { stageShortcut, type StageShortcut } from '@stitch/runtime/shortcuts';
   import { onMount } from 'svelte';
   import type BlocksViewComponent from './lib/BlocksView.svelte';
   import type SoundsPanelComponent from './lib/SoundsPanel.svelte';
@@ -28,7 +29,7 @@
   import { nativeFetch, NetProxy } from './lib/net';
   import NetworkPanel from './lib/NetworkPanel.svelte';
   import { loadSecrets, saveSecrets, type Secret } from './lib/secrets';
-  import { ask, askText, tell } from './lib/dialog.svelte';
+  import { ask, askText, dialogs, tell } from './lib/dialog.svelte';
   import Dialogs from './lib/Dialogs.svelte';
   import Logo from './lib/Logo.svelte';
   import { setThemePref, themePref, type ThemePref } from './lib/theme';
@@ -509,6 +510,14 @@
 
   function onKey(e: KeyboardEvent) {
     if (e.defaultPrevented) return;
+    // Run, Pause and Stop work from anywhere, even inside the code editor (⌘↩ would add a line).
+    const shortcut = stageShortcut(e);
+    if (shortcut) {
+      e.preventDefault();
+      e.stopPropagation();
+      doShortcut(shortcut);
+      return;
+    }
     const t = e.target as HTMLElement | null;
     const mod = e.metaKey || e.ctrlKey;
     // Plain text fields keep their keys; the code editor gets these shortcuts too.
@@ -614,11 +623,22 @@
     closeMic();
   }
 
+  /** ⌘↩, ⌘P and ⌘., pressed in the editor or (forwarded) in the stage. Not while a dialog is up. */
+  function doShortcut(action: StageShortcut) {
+    if (dialogs.queue.length) return;
+    if (action === 'run') void run();
+    else if (action === 'pause') togglePause();
+    else if (running) stop();
+  }
+
   function onStage(m: FromStage) {
     switch (m.t) {
       case 'ready':
         renderer = m.renderer;
         void load();
+        break;
+      case 'shortcut':
+        doShortcut(m.action);
         break;
       case 'log':
         print('log', `${m.sprite}: ${m.text}`);
@@ -661,9 +681,9 @@
 <div class="app">
   <header>
     <div class="brand"><Logo size={22} /><span>Stitch</span></div>
-    <button class="run" onclick={run} title="Run (restart from the beginning)"><Play />Run</button>
-    <button onclick={togglePause} disabled={!running} aria-pressed={paused} class="pause" title={paused ? 'Continue from where it paused' : 'Pause: freeze the game, sound included'}><span class:off={paused}><Pause />Pause</span><span class:off={!paused}><Play />Resume</span></button>
-    <button class="stop" onclick={stop} disabled={!running} title="Stop all scripts"><Square />Stop</button>
+    <button class="run" onclick={run} title="Run (restart from the beginning) (⌘↩)" aria-keyshortcuts="Meta+Enter Control+Enter"><Play />Run</button>
+    <button onclick={togglePause} disabled={!running} aria-pressed={paused} class="pause" title={paused ? 'Continue from where it paused (⌘P)' : 'Pause: freeze the game, sound included (⌘P)'} aria-keyshortcuts="Meta+P Control+P"><span class:off={paused}><Pause />Pause</span><span class:off={!paused}><Play />Resume</span></button>
+    <button class="stop" onclick={stop} disabled={!running} title="Stop all scripts (⌘.)" aria-keyshortcuts="Meta+. Control+."><Square />Stop</button>
     <span class="sep"></span>
     <div class="seg" role="tablist" aria-label="Section">
       <button role="tab" aria-selected={section === 'code'} class:on={section === 'code'} onclick={() => (section = 'code')}>Code</button>

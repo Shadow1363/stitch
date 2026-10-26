@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { normalizeStage } from '@stitch/cart';
 import { createSpace } from '../core/space';
 import { Sprite, type CostumeInfo } from '../core/sprite';
-import { displayTransform } from './transform';
+import { displayTransform, mapOffset } from './transform';
 
 const costume: CostumeInfo = {
   id: 'c',
@@ -50,5 +50,13 @@ describe('displayTransform', () => {
     expect(
       displayTransform(s, costume, createSpace(normalizeStage({})), false).rotation,
     ).toBeCloseTo(Math.PI / 2);
+  });
+});
+
+describe('mapOffset', () => {
+  it('moves the map against the scroll, snapping to whole pixels for pixel art', () => {
+    expect(mapOffset({ x: 10.4, y: 3.6 }, false)).toEqual({ x: -10.4, y: -3.6 });
+    expect(mapOffset({ x: 10.4, y: 3.6 }, true)).toEqual({ x: -10, y: -4 });
+    expect(mapOffset({ x: 0, y: 0 }, true)).toEqual({ x: 0, y: 0 });
   });
 });

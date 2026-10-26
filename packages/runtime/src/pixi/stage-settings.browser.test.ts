@@ -17,6 +17,7 @@ async function redBox(
   y: number,
   pixelArt = false,
   withMap = false,
+  scroll?: { x: number; y: number },
 ) {
   const el = document.createElement('div');
   el.style.cssText = `width:${stage.width}px;height:${stage.height}px;position:absolute;left:0;top:0`;
@@ -68,6 +69,7 @@ async function redBox(
     costumes,
     ...(map ? { map } : {}),
   });
+  if (scroll) world.map!.scroll = scroll;
   r.render(world);
 
   const canvas = r.app.canvas;
@@ -140,6 +142,14 @@ describe('stage settings render in the right place', () => {
       const b = await redBox(stage, 0, 0, true, true);
       expect(b).toMatchObject({ left: 20, top: 10, right: 30, bottom: 20 });
     }
+  });
+
+  it('scrolls the tile map with scroll_map, in whole pixels for pixel art', async () => {
+    const smooth = await redBox(normalizeStage({}), 0, 0, true, true, { x: 15, y: 5 });
+    expect(smooth).toMatchObject({ left: 5, top: 5, right: 15, bottom: 15 });
+    const pixel = normalizeStage({ scaling: { mode: 'fit', filter: 'pixel' } });
+    const snapped = await redBox(pixel, 0, 0, true, true, { x: 14.6, y: 4.4 });
+    expect(snapped).toMatchObject({ left: 5, top: 6, right: 15, bottom: 16 });
   });
 
   it('clips sprites that are off-stage instead of drawing them in the letterbox', async () => {
